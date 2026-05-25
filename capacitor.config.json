@@ -1,0 +1,19 @@
+{
+  "appId": "com.ekidio.app",
+  "appName": "ekidio",
+  "webDir": "dist",
+  "allowNavigation": [
+    "lubomichalko.com",
+    "*.lubomichalko.com"
+  ],
+  "plugins": {
+    "StatusBar": {
+      "overlaysWebView": false,
+      "style": "LIGHT",
+      "backgroundColor": "#ffffffff"
+    },
+    "CapacitorHttp": {
+      "enabled": true
+    }
+  }
+}

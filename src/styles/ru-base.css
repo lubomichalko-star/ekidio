@@ -1,0 +1,234 @@
+:root {
+  /* Theme */
+  --ru-accent: #5abb6f;
+  --ru-accent-light: #5abb6f33;
+
+  /* Neutrals */
+  --ru-bg: #f3f4f6;
+  --ru-text: #0f172a;
+  --ru-muted: #64748b;
+  --ru-border: rgba(15, 23, 42, 0.10);
+
+  /* Radii / Shadows */
+  --ru-radius-md: 14px;
+  --ru-radius-lg: 16px;
+  --ru-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --ru-shadow-accent: 0 20px 40px -20px rgba(90, 187, 111, 0.70);
+}
+
+/* Layout container used across pages */
+.ru-card {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: var(--ru-card-padding, 0 14px 16px);
+  max-width: var(--ru-card-max-width, 760px);
+  margin: 0 auto;
+}
+
+@media (max-width: 768px) {
+  .ru-card {
+    padding: var(--ru-card-padding-mobile, 0 12px 14px);
+  }
+}
+
+.ru-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  position: relative;
+  z-index: 1;
+  background: transparent;
+  padding: 8px 0;
+}
+
+.ru-card__subtitle {
+  margin: 2px 0 0;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.ru-card__body {
+  color: #374151;
+  line-height: 1.6;
+  font-size: 14px;
+  padding: 0;
+}
+
+/* Section headers */
+.ru-section__header h3 {
+  margin: 20px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #bebebe;
+}
+
+/* Page variants */
+.ru-admin-card {
+  position: relative;
+}
+
+/* Buttons */
+.ru-btn {
+  border: 1px solid transparent;
+  border-radius: var(--ru-radius-md);
+  padding: 12px 14px;
+  font-weight: 900;
+  cursor: pointer;
+  background: var(--ru-accent);
+  color: #fff;
+}
+
+.ru-btn--primary {
+  background: var(--ru-accent);
+  color: #fff;
+  box-shadow: var(--ru-shadow-accent);
+}
+
+.ru-btn--full {
+  width: 100%;
+  justify-content: center;
+}
+
+/* In modal footers we often want equal-width buttons in a row. */
+.ru-modal-actions {
+  width: 100%;
+  display: flex;
+  gap: 10px;
+}
+
+.ru-modal-actions .ru-btn {
+  padding-top: 14px;
+  padding-bottom: 14px;
+  font-size: 16px;
+}
+
+.ru-modal-actions .ru-btn--full {
+  flex: 1;
+  width: auto;
+}
+
+@media (max-width: 640px) {
+  .ru-modal-actions {
+    flex-direction: column;
+  }
+
+  .ru-modal-actions .ru-btn,
+  .ru-modal-actions .ru-btn--full {
+    width: 100%;
+  }
+}
+
+.ru-btn--sm {
+  padding-top: 10px;
+  padding-bottom: 10px;
+  font-size: 14px;
+  border-radius: 12px;
+}
+
+.ru-btn.ghost,
+.ru-btn--ghost {
+  background: #fff;
+  color: var(--ru-text);
+  border-color: var(--ru-border);
+  box-shadow: none;
+}
+
+.ru-btn.danger {
+  background: #ef444400;
+  color: #e02020;
+  box-shadow: 0 20px 40px -20px #ef444499;
+}
+
+.ru-btn.ghost.danger,
+.ru-btn--ghost.danger {
+  background: transparent;
+  color: #b91c1c;
+  border-color: #fecaca;
+  box-shadow: none;
+}
+
+.ru-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Chips */
+.ru-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--ru-accent);
+  color: #fff;
+  font-weight: 600;
+  font-size: 12px;
+  box-shadow: 0 10px 25px -15px rgba(14, 165, 233, 0.8);
+}
+
+.ru-chip--points {
+  background: var(--ru-accent-light);
+  color: #d69116;
+  /* Keep this neutral so it doesn't depend on color-mix() support */
+  box-shadow: 0 10px 25px -15px rgba(15, 23, 42, 0.18);
+}
+
+/* WP themes sometimes override <strong> colors - enforce consistency */
+.ru-chip--points strong {
+  color: inherit;
+}
+
+.ru-chip.lg {
+  font-size: 22px;
+  padding: 10px 14px;
+}
+
+.ru-coin {
+  width: 25px;
+  height: 25px;
+  object-fit: contain;
+}
+
+/* Days */
+.ru-days-bar {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin: 10px 0 18px;
+}
+
+.ru-day-pill {
+  border: 1px solid #e5e7eb;
+  background: #f8fafc;
+  border-radius: 999px;
+  width: 35px;
+  height: 35px;
+  padding: 0;
+  font-weight: 500;
+  color: #cdcdcd;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ru-day-pill.active {
+  background: var(--ru-accent);
+  color: #fff;
+  border-color: var(--ru-accent);
+}
+
+@media (max-width: 768px) {
+  .ru-day-pill {
+    width: 35px;
+    height: 35px;
+    min-height: 35px;
+  }
+}
+

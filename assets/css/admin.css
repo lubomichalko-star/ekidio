@@ -1,0 +1,76 @@
+/* Admin-only styles for ekidio */
+
+.ru-admin-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ru-feedback-table .ru-feedback-path {
+  word-break: break-all;
+}
+
+.ru-feedback-table .ru-feedback-text {
+  word-break: break-word;
+}
+
+/* Mobile admin breakpoint (WordPress uses ~782px) */
+@media screen and (max-width: 782px) {
+  .ru-feedback-table {
+    border: 0;
+  }
+
+  .ru-feedback-table thead {
+    display: none;
+  }
+
+  .ru-feedback-table,
+  .ru-feedback-table tbody,
+  .ru-feedback-table tr,
+  .ru-feedback-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .ru-feedback-table tr {
+    margin: 0 0 12px;
+    border: 1px solid #dcdcde;
+    background: #fff;
+  }
+
+  .ru-feedback-table td {
+    border: 0;
+    border-top: 1px solid #f0f0f1;
+    padding: 10px 12px;
+  }
+
+  .ru-feedback-table td:first-child {
+    border-top: 0;
+  }
+
+  .ru-feedback-table td::before {
+    content: attr(data-label);
+    display: block;
+    font-weight: 600;
+    margin: 0 0 4px;
+  }
+
+  .ru-feedback-table td.ru-feedback-actions {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .ru-feedback-table td.ru-feedback-actions::before {
+    content: "";
+    display: none;
+  }
+
+  .ru-feedback-table td.ru-feedback-empty {
+    border: 1px solid #dcdcde;
+    background: #fff;
+  }
+
+  .ru-feedback-table td.ru-feedback-empty::before {
+    content: "";
+    display: none;
+  }
+}
