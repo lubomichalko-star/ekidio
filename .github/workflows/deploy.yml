@@ -1,11 +1,16 @@
-# Automatický deploy na server cez FTP (hosting bez SSH).
-# Secrets: Settings → Secrets and variables → Actions
+# Deploy na server cez FTP (hosting bez SSH).
 #
-#   FTP_SERVER        – napr. ftp.ekidio.com (bez ftp://)
-#   FTP_USERNAME      – FTP používateľ
-#   FTP_PASSWORD      – FTP heslo
-#   FTP_PLUGIN_DIR    – cesta k pluginu, napr. public_html/wp-content/plugins/rodinne-ulohy
-#   FTP_DOWNLOAD_DIR  – voliteľné, napr. public_html/download
+# Secrets (Settings → Secrets and variables → Actions):
+#   FTP_SERVER         – napr. ekidio.com alebo ftp.ekidio.com (NIE meno účtu)
+#   FTP_USERNAME       – napr. github.ekidio.com
+#   FTP_PASSWORD
+#   FTP_PLUGIN_DIR     – pre účet smerovaný do pluginu: /
+#   FTP_PROTOCOL       – ftps (odporúčané) alebo ftp
+#   FTP_PORT           – 21 (ftps explicit) alebo 990 (ftps implicit)
+#   FTP_DOWNLOAD_DIR   – voliteľné, len ak účet má prístup mimo pluginu
+#
+# Účet github.ekidio.com → /wp-content/plugins/ekidio
+# FTP_PLUGIN_DIR musí byť: /
 
 name: Deploy to server (FTP)
 
@@ -21,6 +26,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
@@ -40,16 +46,30 @@ jobs:
       - name: Prepare plugin package
         run: node scripts/prepare-plugin-deploy.mjs
 
+      - name: Test FTP port reachability
+        run: |
+          PORT=21
+          SERVER="${{ secrets.FTP_SERVER }}"
+          echo "Kontrola portu $PORT na $SERVER ..."
+          if timeout 15 bash -c "cat < /dev/null > /dev/tcp/$SERVER/$PORT"; then
+            echo "Port $PORT je dostupný."
+          else
+            echo "Port $PORT nie je dostupný – skontroluj FTP_SERVER (skús ekidio.com alebo ftp.ekidio.com)."
+          fi
+
       - name: Deploy WordPress plugin
         uses: SamKirkland/FTP-Deploy-Action@v4.3.6
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          port: 21
           local-dir: deploy/plugin/
           server-dir: ${{ secrets.FTP_PLUGIN_DIR }}
           dangerous-clean-slate: true
-          log-level: minimal
+          timeout: 300000
+          log-level: verbose
 
       - name: Deploy download folder
         env:
@@ -68,6 +88,9 @@ jobs:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          port: 21
           local-dir: download/
           server-dir: ${{ env.FTP_DOWNLOAD_DIR }}
-          log-level: minimal
+          timeout: 300000
+          log-level: verbose

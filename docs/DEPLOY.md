@@ -40,8 +40,10 @@ Repozitár → **Settings** → **Secrets and variables** → **Actions** → **
 | `FTP_SERVER` | `ftp.ekidio.com` |
 | `FTP_USERNAME` | `uzivatel@ekidio.com` |
 | `FTP_PASSWORD` | heslo k FTP |
-| `FTP_PLUGIN_DIR` | `public_html/wp-content/plugins/rodinne-ulohy` |
-| `FTP_DOWNLOAD_DIR` | `public_html/download` (voliteľné) |
+| `FTP_PLUGIN_DIR` | `/` (účet `github.ekidio.com` je už v `plugins/ekidio`) |
+| `FTP_PROTOCOL` | `ftps` (ak zlyhá, skús `ftp`) |
+| `FTP_PORT` | `21` (ak zlyhá ftps, skús `990`) |
+| `FTP_DOWNLOAD_DIR` | len ak účet má prístup – inak vynechaj |
 
 `FTP_SERVER` bez `ftp://` – len hostname.
 
