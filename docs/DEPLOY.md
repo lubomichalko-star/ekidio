@@ -1,60 +1,52 @@
-# Deploy na server (FTP)
+# Deploy len cez GitHub (bez PC)
 
-## Prečo GitHub Actions zlyháva (`ETIMEDOUT`)
+Hosting **blokuje FTP z GitHub cloudu**, preto deploy nejde priamo z Actions cez FTP.
+Riešenie: GitHub zbuildí plugin a publikuje vetvu **`deploy`**, hosting si ju **sám stiahne**.
 
-FileZilla z tvojho PC **funguje**, ale GitHub cloud **nie** – hosting blokuje FTP z IP adres cloud serverov (185.102.21.128:21 timeout).
+## Ako pracuješ
 
-To nie je zlý heslo ani zlá cesta – je to firewall hostingu.
+1. Uprav kód na **github.com** (web editor, Codespaces, alebo push odkiaľkoľvek)
+2. Zmeny mergni / pushni do vetvy **`main`**
+3. GitHub Actions spustí workflow **Build and publish deploy branch**
+4. Hosting stiahne vetvu **`deploy`** do `wp-content/plugins/ekidio`
 
-## Riešenie A – deploy z PC (najrýchlejšie)
+Na PC nič spúšťať nemusíš.
 
-### 1. Vytvor `.env.deploy` (raz)
+## Nastavenie hostingu (raz)
 
-Skopíruj `.env.deploy.example` → `.env.deploy` a doplň heslo:
+V administrácii hostingu (nameserver.sk / panel) nájdi sekciu typu:
 
-```
-FTP_SERVER=ftp.ekidio.com
-FTP_USERNAME=github.ekidio.com
-FTP_PASSWORD=tvoje_heslo
-FTP_PLUGIN_DIR=/
-```
+- **Git**
+- **Deploy z GitHubu**
+- **Verziovanie**
 
-### 2. Deploy jedným príkazom
+Nastav:
 
-```powershell
-cd "C:\Users\lubom\Desktop\web\domace prace\ekidio"
-npm run deploy:ftp
-```
+| Pole | Hodnota |
+|------|---------|
+| Repozitár | `https://github.com/lubomichalko-star/ekidio.git` |
+| Vetva | `deploy` |
+| Cieľová cesta | `/home/html/ekidio.com/public_html/wp-content/plugins/ekidio` |
 
-Build + upload – rovnaké údaje ako FileZilla.
+Účet `github.ekidio.com` (FTP) už smeruje do toho istého priečinka – git deploy by mal ísť sem.
 
-## Riešenie B – automat po `git push` (self-hosted runner)
+Ak panel Git neponúka, napíš podpore hostingu:
 
-Workflow beží na **tvojom PC**, nie v GitHub cloude → FTP funguje.
-
-### 1. GitHub → Settings → Actions → Runners → **New self-hosted runner**
-
-- OS: **Windows**, architektúra **x64**
-- Postupuj podľa inštrukcií (stiahni runner, spusti `config.cmd`)
-
-### 2. Pri registrácii runnera
-
-- Labels: nechaj `self-hosted`, `Windows`, `X64` (workflow to vyžaduje)
-- Spusti runner: `run.cmd` (nech beží na pozadí alebo pri štarte PC)
-
-### 3. Secrets na GitHube (už máš)
-
-| Secret | Hodnota |
-|--------|---------|
-| `FTP_SERVER` | `ftp.ekidio.com` |
-| `FTP_USERNAME` | `github.ekidio.com` |
-| `FTP_PASSWORD` | heslo |
-| `FTP_PLUGIN_DIR` | `/` |
-
-### 4. Push → deploy
-
-Keď PC a runner bežia, `git push` spustí deploy automaticky.
+> Chcem automatický deploy z GitHubu (vetva deploy) do wp-content/plugins/ekidio. FTP z externých IP nefunguje, potrebujem git pull / webhook deploy.
 
 ## Overenie
 
-Po deployi: ekidio.com → **Ctrl+F5** → skontroluj verziu na login stránke.
+1. GitHub → **Actions** → posledný beh musí byť zelený
+2. GitHub → prepni vetvu na **`deploy`** – uvidíš `rodinne-ulohy.php`, `includes/`, `dist/`
+3. ekidio.com → **Ctrl+F5** → skontroluj verziu na login stránke
+
+## Ručný re-deploy
+
+GitHub → **Actions** → **Build and publish deploy branch** → **Run workflow**
+
+## Záložný spôsob (len ak treba)
+
+Ak hosting nemá git deploy, jediné možnosti sú:
+
+- zmeniť hosting (VPS s SSH), alebo
+- `npm run deploy:ftp` z PC (FileZilla funguje len z tvojej siete)

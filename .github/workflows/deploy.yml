@@ -1,28 +1,30 @@
-# Deploy cez FTP – beží na self-hosted runner (tvoj PC).
-# Hosting blokuje FTP z GitHub cloud IP → ubuntu-latest nefunguje.
+# Build + publish vetva deploy (GitHub-only workflow).
+# Hosting si stiahne vetvu deploy do wp-content/plugins/ekidio (nastavíš raz v paneli).
 #
-# Možnosti:
-#   A) npm run deploy:ftp  (najrýchlejšie, z tvojho PC)
-#   B) Self-hosted runner  (automat po push, PC musí bežať)
-#
-# Secrets (rovnaké ako pre FileZilla):
-#   FTP_SERVER, FTP_USERNAME, FTP_PASSWORD, FTP_PLUGIN_DIR=/
+# Pracovný postup:
+#   1. Uprav kód na GitHube (web editor / Codespaces)
+#   2. Push do main
+#   3. Actions zbuildí plugin a aktualizuje vetvu deploy
+#   4. Hosting automaticky spraví git pull (ak je zapnuté)
 
-name: Deploy to server (FTP)
+name: Build and publish deploy branch
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 concurrency:
   group: deploy-main
   cancel-in-progress: true
 
 jobs:
-  deploy:
-    runs-on: [self-hosted, Windows, X64]
-    timeout-minutes: 20
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
@@ -34,14 +36,16 @@ jobs:
           node-version: '20'
           cache: npm
 
-      - name: Install, build & deploy
-        env:
-          FTP_SERVER: ${{ secrets.FTP_SERVER }}
-          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
-          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
-          FTP_PLUGIN_DIR: ${{ secrets.FTP_PLUGIN_DIR }}
+      - name: Build plugin package
         run: |
           npm ci
           npm run build
           node scripts/prepare-plugin-deploy.mjs
-          node scripts/deploy-ftp.mjs
+
+      - name: Publish deploy branch
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: deploy
+          folder: deploy/plugin
+          single-commit: true
+          commit-message: Deploy from ${{ github.sha }}
