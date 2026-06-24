@@ -1,0 +1,73 @@
+# Automatický deploy na server cez FTP (hosting bez SSH).
+# Secrets: Settings → Secrets and variables → Actions
+#
+#   FTP_SERVER        – napr. ftp.ekidio.com (bez ftp://)
+#   FTP_USERNAME      – FTP používateľ
+#   FTP_PASSWORD      – FTP heslo
+#   FTP_PLUGIN_DIR    – cesta k pluginu, napr. public_html/wp-content/plugins/rodinne-ulohy
+#   FTP_DOWNLOAD_DIR  – voliteľné, napr. public_html/download
+
+name: Deploy to server (FTP)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install & build
+        run: |
+          npm ci
+          npm run build
+
+      - name: Prepare plugin package
+        run: node scripts/prepare-plugin-deploy.mjs
+
+      - name: Deploy WordPress plugin
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: deploy/plugin/
+          server-dir: ${{ secrets.FTP_PLUGIN_DIR }}
+          dangerous-clean-slate: true
+          log-level: minimal
+
+      - name: Deploy download folder
+        env:
+          FTP_DOWNLOAD_DIR: ${{ secrets.FTP_DOWNLOAD_DIR }}
+        run: |
+          if [ -z "$FTP_DOWNLOAD_DIR" ]; then
+            echo "FTP_DOWNLOAD_DIR nie je nastavený – preskakujem download/"
+            exit 0
+          fi
+          echo "FTP_DOWNLOAD_DIR=$FTP_DOWNLOAD_DIR" >> "$GITHUB_ENV"
+
+      - name: Upload download folder
+        if: env.FTP_DOWNLOAD_DIR != ''
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: download/
+          server-dir: ${{ env.FTP_DOWNLOAD_DIR }}
+          log-level: minimal
