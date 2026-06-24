@@ -318,6 +318,7 @@ class Rodinne_Ulohy_Ajax {
             'shared_task' => isset($_POST['shared_task']) ? 1 : 0,
             'estimated_time' => !empty($_POST['estimated_time']) ? intval($_POST['estimated_time']) : null,
             'rating' => isset($_POST['rating']) && $_POST['rating'] !== '' ? intval($_POST['rating']) : null,
+            'icon' => sanitize_text_field($_POST['icon'] ?? ''),
         );
         
         if (empty($data['name'])) {

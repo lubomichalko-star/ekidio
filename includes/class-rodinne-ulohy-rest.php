@@ -376,6 +376,11 @@ class Rodinne_Ulohy_Rest {
             'permission_callback' => array($this, 'permission_parent'),
             'callback' => array($this, 'parent_change_password'),
         ));
+        register_rest_route($ns, '/parent/account/delete', array(
+            'methods' => 'POST',
+            'permission_callback' => array($this, 'permission_parent'),
+            'callback' => array($this, 'parent_delete_account'),
+        ));
 
         register_rest_route($ns, '/rewards', array(
             array(
@@ -438,9 +443,16 @@ class Rodinne_Ulohy_Rest {
             ),
         ));
         register_rest_route($ns, '/admin/weekend-multiplier', array(
-            'methods' => 'POST',
-            'permission_callback' => array($this, 'permission_parent'),
-            'callback' => array($this, 'admin_weekend_multiplier'),
+            array(
+                'methods' => 'GET',
+                'permission_callback' => array($this, 'permission_parent'),
+                'callback' => array($this, 'admin_get_weekend_multiplier'),
+            ),
+            array(
+                'methods' => 'POST',
+                'permission_callback' => array($this, 'permission_parent'),
+                'callback' => array($this, 'admin_weekend_multiplier'),
+            ),
         ));
 
         // Dangerous admin resets (parent only)
@@ -853,6 +865,9 @@ class Rodinne_Ulohy_Rest {
         }
 
         if (!$child_id) {
+            if ($username === '' && $password === '' && $child_code === '') {
+                return new WP_Error('ru_login_invalid', __('Chýba meno alebo heslo', 'rodinne-ulohy'), array('status' => 400));
+            }
             return new WP_Error('ru_login_invalid', __('Chýba kód dieťaťa', 'rodinne-ulohy'), array('status' => 400));
         }
         $child = Rodinne_Ulohy_Database::get_child($child_id);
@@ -1425,6 +1440,7 @@ class Rodinne_Ulohy_Rest {
                 'rotation_enabled' => isset($task->rotation_enabled) ? intval($task->rotation_enabled) : 0,
                 'shared_task' => isset($task->shared_task) ? intval($task->shared_task) : 0,
                 'rating' => isset($task->rating) ? intval($task->rating) : 0,
+                'icon' => isset($task->icon) ? (string) $task->icon : '',
                 'package_id' => isset($task->package_id) ? intval($task->package_id) : null,
                 'children' => array_map(function($c) {
                     return array(
@@ -1627,6 +1643,7 @@ class Rodinne_Ulohy_Rest {
             'shared_task' => !empty($task['shared_task']) ? 1 : 0,
             'estimated_time' => $task['estimated_time'] ?? null,
             'rating' => $task['rating'] ?? null,
+            'icon' => sanitize_text_field($task['icon'] ?? ''),
         );
 
         $is_new = empty($data['id']);
@@ -2223,6 +2240,54 @@ class Rodinne_Ulohy_Rest {
         return array('ok' => true);
     }
 
+    /**
+     * Parent: permanently delete the authenticated WP user account.
+     */
+    public function parent_delete_account($request) {
+        $ctx = $this->authenticate($request);
+        if (is_wp_error($ctx)) return $ctx;
+
+        $u = wp_get_current_user();
+        if (!$u || empty($u->ID)) {
+            return new WP_Error('ru_forbidden', __('Nemáte oprávnenie', 'rodinne-ulohy'), array('status' => 403));
+        }
+
+        $body = $request->get_json_params();
+        if (!is_array($body)) $body = array();
+        $current = strval($body['current_password'] ?? '');
+        $confirm = strtoupper(trim(strval($body['confirm_text'] ?? '')));
+        $confirm = str_replace(array('Á', 'Ä'), array('A', 'A'), $confirm);
+
+        $google_sub = strval(get_user_meta($u->ID, 'ru_google_sub', true));
+        $has_google = $google_sub !== '';
+
+        if ($has_google && $current === '') {
+            if ($confirm !== 'ZRUSIT') {
+                return new WP_Error('ru_invalid', __('Pre potvrdenie napíšte ZRUŠIŤ', 'rodinne-ulohy'), array('status' => 400));
+            }
+        } elseif ($current === '' || !wp_check_password($current, $u->user_pass, $u->ID)) {
+            return new WP_Error('ru_invalid', __('Heslo nie je správne', 'rodinne-ulohy'), array('status' => 400));
+        }
+
+        $user_id = intval($u->ID);
+        $token = isset($ctx['token']) ? strval($ctx['token']) : '';
+
+        $res = Rodinne_Ulohy_Database::delete_wp_user_account($user_id);
+        if (is_wp_error($res)) return $res;
+        if ($res === false) {
+            return new WP_Error('ru_failed', __('Účet sa nepodarilo zrušiť', 'rodinne-ulohy'), array('status' => 500));
+        }
+
+        if ($token !== '') {
+            Rodinne_Ulohy_Database::revoke_api_token($token);
+        }
+
+        return array(
+            'ok' => true,
+            'deleted_owner_data' => !empty($res['deleted_owner_data']),
+        );
+    }
+
     public function rewards_list($request) {
         $ctx = $this->authenticate($request);
         if (is_wp_error($ctx)) return $ctx;
@@ -2403,6 +2468,10 @@ class Rodinne_Ulohy_Rest {
         return $this->admin_get_rotation_settings($request);
     }
 
+    public function admin_get_weekend_multiplier($request) {
+        return array('multiplier' => floatval(Rodinne_Ulohy_Database::get_weekend_penalty_multiplier()));
+    }
+
     public function admin_weekend_multiplier($request) {
         $body = $request->get_json_params();
         $multiplier = isset($body['multiplier']) ? floatval($body['multiplier']) : 3;
@@ -2448,6 +2517,25 @@ class Rodinne_Ulohy_Rest {
     // -----------------------
     // Child endpoints
     // -----------------------
+    private function resolve_overview_week_start($request) {
+        $raw = sanitize_text_field($request->get_param('week_start') ?? '');
+        if ($raw === '') {
+            return Rodinne_Ulohy_Database::get_current_week_start();
+        }
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $raw)) {
+            return Rodinne_Ulohy_Database::get_current_week_start();
+        }
+        try {
+            $dt = new DateTime($raw, wp_timezone());
+            if ((int) $dt->format('N') !== 1) {
+                return Rodinne_Ulohy_Database::get_current_week_start();
+            }
+            return $dt->format('Y-m-d');
+        } catch (Exception $e) {
+            return Rodinne_Ulohy_Database::get_current_week_start();
+        }
+    }
+
     public function child_overview($request) {
         $ctx = $this->authenticate($request);
         if (is_wp_error($ctx)) return $ctx;
@@ -2461,7 +2549,9 @@ class Rodinne_Ulohy_Rest {
         if (!$child) return new WP_Error('ru_not_found', __('Dieťa nebolo nájdené', 'rodinne-ulohy'), array('status' => 404));
         $owner_user_id = isset($child->owner_user_id) ? intval($child->owner_user_id) : 0;
 
-        $week_start = Rodinne_Ulohy_Database::get_current_week_start();
+        $current_week_start = Rodinne_Ulohy_Database::get_current_week_start();
+        $week_start = $this->resolve_overview_week_start($request);
+        $is_current_week = ($week_start === $current_week_start);
         $week_range = Rodinne_Ulohy_Database::get_week_range($week_start);
         $all_assignments = Rodinne_Ulohy_Database::get_child_assignments($child_id, $week_start);
 
@@ -2471,6 +2561,7 @@ class Rodinne_Ulohy_Rest {
         $auto_regenerated = false;
         $needs_regen_flag = false;
         if (
+            $is_current_week &&
             isset($ctx['subject_type']) &&
             $ctx['subject_type'] === 'wp_user' &&
             !empty($owner_user_id) &&
@@ -2543,11 +2634,12 @@ class Rodinne_Ulohy_Rest {
                 $assignment->rotation_enabled = isset($task->rotation_enabled) ? intval($task->rotation_enabled) : 0;
                 $assignment->description = isset($task->description) ? $task->description : '';
                 $assignment->days_of_week = $days_of_week;
+                $assignment->task_icon = isset($task->icon) ? (string) $task->icon : '';
 
                 // Self-heal: daily reset safety net
                 // If WP cron didn't run, a task completed "yesterday" may remain completed today.
                 // For today's view only, reset such tasks back to todo based on completed_at date.
-                if (intval($day_to_show) === intval($current_day) && $assignment->task_type === 'daily') {
+                if ($is_current_week && intval($day_to_show) === intval($current_day) && $assignment->task_type === 'daily') {
                     $completed_at = isset($assignment->completed_at) ? strval($assignment->completed_at) : '';
                     if ($assignment->status === 'completed' && !empty($completed_at)) {
                         $completed_date = date('Y-m-d', strtotime($completed_at));
@@ -2574,7 +2666,7 @@ class Rodinne_Ulohy_Rest {
                 // Self-heal: if assignment status got reset (e.g. after regeneration),
                 // but points were already awarded for this task, mark it as completed again.
                 // This prevents "double clicking" after plan changes and keeps UI consistent with points history.
-                if ($assignment->status !== 'completed') {
+                if ($is_current_week && intval($day_to_show) === intval($current_day) && $assignment->status !== 'completed') {
                     $effective_task_type = isset($assignment->task_type) ? $assignment->task_type : 'weekly';
                     $already = Rodinne_Ulohy_Database::points_already_added_for_task(
                         intval($assignment->child_id),
@@ -2607,6 +2699,26 @@ class Rodinne_Ulohy_Rest {
                         }
                     }
                 }
+
+                // When browsing another day in the calendar, daily assignments in DB may already
+                // be reset for today. Reconstruct that day's done-state from points history.
+                if (intval($day_to_show) !== intval($current_day)) {
+                    $target_ymd = Rodinne_Ulohy_Database::ymd_for_week_day($week_start, $day_to_show);
+                    if (!empty($target_ymd) && $target_ymd <= $today_date) {
+                        $entry = Rodinne_Ulohy_Database::get_last_task_points_entry_for_date(
+                            intval($assignment->child_id),
+                            intval($assignment->task_id),
+                            $target_ymd
+                        );
+                        if ($entry && intval($entry->points) > 0) {
+                            $assignment->status = 'completed';
+                            $assignment->completed_at = $entry->created_at;
+                        } else {
+                            $assignment->status = 'todo';
+                            $assignment->completed_at = null;
+                        }
+                    }
+                }
                 if ($assignment->task_category === 'dobrovolne') {
                     $dobrovolne_assignments[] = $assignment;
                 } else {
@@ -2629,12 +2741,14 @@ class Rodinne_Ulohy_Rest {
             ),
             'has_pin' => !empty($child->password),
             'needs_regeneration' => (
+                $is_current_week &&
                 isset($ctx['subject_type']) &&
                 $ctx['subject_type'] === 'wp_user' &&
                 !empty($owner_user_id) &&
                 intval($this->resolve_owner_user_id($ctx)) === intval($owner_user_id) &&
                 !empty($needs_regen_flag)
             ),
+            'week_start' => $week_start,
             'week_range' => $week_range,
             'day' => intval($day_to_show),
             'points_balance' => intval($points_balance->balance),
@@ -2657,6 +2771,7 @@ class Rodinne_Ulohy_Rest {
                 'active_counts' => $active_reward_counts,
                 'active_purchases' => $active_purchases_payload,
             ),
+            'weekendMultiplier' => floatval(Rodinne_Ulohy_Database::get_weekend_penalty_multiplier()),
         );
     }
 
@@ -2786,16 +2901,27 @@ class Rodinne_Ulohy_Rest {
         $points_today = Rodinne_Ulohy_Database::get_today_points_total($child_id);
         $active = Rodinne_Ulohy_Database::get_child_active_reward_purchases($child_id);
         $counts = array();
+        $active_purchases_payload = array();
         foreach ($active as $purchase) {
             $rid = intval($purchase->reward_id);
             if (!isset($counts[$rid])) $counts[$rid] = 0;
             $counts[$rid]++;
+            $active_purchases_payload[] = array(
+                'id' => intval($purchase->id),
+                'reward_id' => $rid,
+                'title' => isset($purchase->reward_title) ? $purchase->reward_title : '',
+                'icon' => isset($purchase->reward_icon) ? $purchase->reward_icon : '',
+                'points_cost' => isset($purchase->reward_points_cost) ? intval($purchase->reward_points_cost) : 0,
+                'created_at' => isset($purchase->created_at) ? $purchase->created_at : '',
+            );
         }
 
         return array(
             'points_balance' => intval($balance->balance),
             'points_today' => intval($points_today),
             'active_counts' => $counts,
+            'active_purchases' => $active_purchases_payload,
+            'purchase_id' => intval($result['purchase_id'] ?? 0),
         );
     }
 

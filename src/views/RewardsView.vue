@@ -29,23 +29,30 @@
     </header>
 
     <template v-if="isParent">
-      <div class="ru-card__body" v-if="loading">Načítavam…</div>
+      <div class="ru-card__body" v-if="loading && !rewards.length">Načítavam…</div>
       <div class="ru-card__body" v-else-if="error">
         <p class="ru-error">{{ error }}</p>
       </div>
       <div class="ru-card__body" v-else>
-        <div class="ru-rewards">
+        <div class="ru-task-list">
           <button
-            class="ru-reward-card"
+            class="ru-task-item"
             v-for="reward in rewards"
             :key="reward.id"
             type="button"
             @click="editReward(reward)"
           >
-            <div class="ru-reward-card__icon">{{ reward.icon || '🎁' }}</div>
-            <div class="ru-reward-card__title">{{ reward.title }}</div>
-            <div class="ru-reward-card__details" v-if="reward.details">{{ reward.details }}</div>
-            <div class="ru-reward-card__cost">{{ reward.points_cost }} bodov</div>
+            <div class="ru-task-item__icon-wrap ru-task-item__icon-wrap--emoji">
+              <span aria-hidden="true">{{ reward.icon || '🎁' }}</span>
+            </div>
+            <div class="ru-task-item__body">
+              <div class="ru-task-item__title">{{ reward.title }}</div>
+              <div class="ru-task-item__desc" v-if="reward.details">{{ reward.details }}</div>
+            </div>
+            <div class="ru-task-item__points">
+              <img :src="coinIcon" alt="" class="ru-coin" />
+              <span class="ru-task-item__points-value">{{ reward.points_cost }}</span>
+            </div>
           </button>
         </div>
       </div>
@@ -57,37 +64,46 @@
       </div>
       <div class="ru-card__body" v-else-if="childLoading">Načítavam…</div>
       <div class="ru-card__body" v-else>
-        <div class="ru-rewards">
+        <div class="ru-task-list">
           <div
-            class="ru-reward-card"
+            class="ru-task-item ru-reward-row"
             v-for="reward in childRewardsSorted"
             :key="reward.id"
             :class="{ disabled: !canBuy(reward), purchased: activeCount(reward.id) > 0 }"
           >
-            <div class="ru-reward-card__icon">{{ reward.icon || '🎁' }}</div>
-            <div class="ru-reward-card__title">{{ reward.title }}</div>
-            <div class="ru-reward-card__details" v-if="reward.details">{{ reward.details }}</div>
-            <div class="ru-reward-card__cost">{{ reward.points_cost }} bodov</div>
-            <div class="ru-reward-card__badge" v-if="activeCount(reward.id) > 0">
-              {{ activeCount(reward.id) }}×
+            <div class="ru-task-item__icon-wrap ru-task-item__icon-wrap--emoji">
+              <span aria-hidden="true">{{ reward.icon || '🎁' }}</span>
             </div>
-            <button
-              class="ru-btn-buy"
-              :disabled="!canBuy(reward) || purchaseLoading === reward.id"
-              @click="purchaseReward(reward)"
-            >
-              <span v-if="purchaseLoading === reward.id">...</span>
-              <span v-else>{{ canBuy(reward) ? 'Kúpiť' : 'Málo bodov' }}</span>
-            </button>
-            <button
-              class="ru-btn-buy ru-btn-buy--use"
-              v-if="activeCount(reward.id) > 0"
-              :disabled="useLoading === reward.id || !firstActivePurchaseId(reward.id)"
-              @click="usePurchasedReward(reward)"
-            >
-              <span v-if="useLoading === reward.id">...</span>
-              <span v-else>Uplatniť</span>
-            </button>
+            <div class="ru-task-item__body">
+              <div class="ru-task-item__title">{{ reward.title }}</div>
+              <div class="ru-task-item__desc" v-if="reward.details">{{ reward.details }}</div>
+              <div class="ru-reward-row__actions">
+                <button
+                  class="ru-btn-buy"
+                  :disabled="!canBuy(reward) || purchaseLoading === reward.id"
+                  @click="purchaseReward(reward)"
+                >
+                  <span v-if="purchaseLoading === reward.id">...</span>
+                  <span v-else>{{ canBuy(reward) ? 'Kúpiť' : 'Málo bodov' }}</span>
+                </button>
+                <button
+                  class="ru-btn-buy ru-btn-buy--use"
+                  v-if="activeCount(reward.id) > 0"
+                  :disabled="useLoading === reward.id || !firstActivePurchaseId(reward.id)"
+                  @click="usePurchasedReward(reward)"
+                >
+                  <span v-if="useLoading === reward.id">...</span>
+                  <span v-else>Uplatniť</span>
+                </button>
+              </div>
+            </div>
+            <div class="ru-task-item__points">
+              <span class="ru-reward-row__badge" v-if="activeCount(reward.id) > 0">
+                {{ activeCount(reward.id) }}×
+              </span>
+              <img :src="coinIcon" alt="" class="ru-coin" />
+              <span class="ru-task-item__points-value">{{ reward.points_cost }}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -206,7 +222,9 @@ import { useRoute, useRouter } from 'vue-router';
 import { rewardsApi } from '../api/rewards';
 import { api } from '../api/client';
 import RuModal from '../components/RuModal.vue';
-import { getCachedRewards, setCachedRewards, getCachedOverview, setCachedOverview } from '../state/preloadCache';
+import { getCachedRewards, setCachedRewards, syncChildOverviewSnapshot } from '../state/preloadCache';
+import { useEffectiveChildId, useChildIdLoadTrigger } from '../composables/useEffectiveChildId';
+import { useKeepAliveChildOverview } from '../composables/useKeepAliveChildOverview';
 
 const safeLsGet = (key) => {
   try {
@@ -229,6 +247,10 @@ const props = defineProps({
     type: Object,
     default: () => ({}),
   },
+  appReady: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const route = useRoute();
@@ -240,13 +262,10 @@ const localAccent = ref(safeLsGet('ru-accent'));
 const parentAccentFixed = '#5abb6f';
 import coinPng from '../images/star.png';
 const coinIcon = coinPng;
-const effectiveChildId = computed(() => {
-  return (
-    props.childId ||
-    localized.value.childId ||
-    children.value[0]?.id ||
-    ''
-  );
+const effectiveChildId = useEffectiveChildId({
+  childId: computed(() => props.childId),
+  route,
+  localized,
 });
 
 const isParent = computed(() => {
@@ -283,9 +302,28 @@ const form = ref({
 
 const childLoading = ref(true);
 const childError = ref('');
-const childData = ref(null);
 const purchaseLoading = ref(null);
 const useLoading = ref(null);
+
+const {
+  childData,
+  loading: childOverviewLoading,
+  error: childOverviewError,
+  loadOverview: loadChildOverview,
+  applySnapshot: applyChildOverviewSnapshot,
+  applyPatch: applyChildOverviewPatch,
+} = useKeepAliveChildOverview({
+  api,
+  effectiveChildId,
+  enabled: computed(() => !isParent.value),
+});
+
+watch(childOverviewLoading, (v) => {
+  childLoading.value = v;
+});
+watch(childOverviewError, (v) => {
+  childError.value = v;
+});
 
 const showImportModal = ref(false);
 const importSourcesLoading = ref(false);
@@ -302,25 +340,28 @@ const accentColor = computed(() =>
 );
 const accentLight = computed(() => `${accentColor.value}33`);
 
-const loadData = async ({ force = false } = {}) => {
+const loadData = async ({ force = false, background = false } = {}) => {
   if (!isParent.value) return;
   if (!force) {
     const cached = getCachedRewards();
     if (Array.isArray(cached)) {
       rewards.value = cached;
       loading.value = false;
+      loadData({ force: true, background: true });
       return;
     }
   }
-  loading.value = true;
-  error.value = '';
+  if (!background) {
+    loading.value = true;
+    error.value = '';
+  }
   try {
     rewards.value = await rewardsApi.list();
     setCachedRewards(rewards.value);
   } catch (e) {
-    error.value = e?.message || 'Chyba pri načítaní odmien';
+    if (!background) error.value = e?.message || 'Chyba pri načítaní odmien';
   } finally {
-    loading.value = false;
+    if (!background) loading.value = false;
   }
 };
 
@@ -371,29 +412,7 @@ const deleteReward = async (reward) => {
 };
 
 const loadChildData = async () => {
-  if (isParent.value) return;
-  if (!effectiveChildId.value) {
-    childError.value = 'Chýba ID dieťaťa';
-    childLoading.value = false;
-    return;
-  }
-  const day = new Date().getDay();
-  const cached = getCachedOverview(effectiveChildId.value, day);
-  if (cached) {
-    childData.value = cached;
-    childLoading.value = false;
-    return;
-  }
-  childLoading.value = true;
-  childError.value = '';
-  try {
-    childData.value = await api.getChildOverview(effectiveChildId.value, null);
-    setCachedOverview(effectiveChildId.value, day, childData.value);
-  } catch (e) {
-    childError.value = e?.message || 'Chyba pri načítaní odmien';
-  } finally {
-    childLoading.value = false;
-  }
+  await loadChildOverview();
 };
 
 const canBuy = (reward) => {
@@ -403,7 +422,45 @@ const canBuy = (reward) => {
 
 const activeCount = (rewardId) => {
   if (!childData.value || !childData.value.rewards || !childData.value.rewards.active_counts) return 0;
-  return childData.value.rewards.active_counts[rewardId] || 0;
+  const counts = childData.value.rewards.active_counts;
+  return Number(counts[rewardId] ?? counts[String(rewardId)] ?? 0);
+};
+
+const mergePurchaseResult = (prev, reward, res) => {
+  const rewards = { ...(prev.rewards || {}) };
+  const rid = Number(reward?.id || 0);
+
+  if (res?.active_counts) {
+    rewards.active_counts = { ...res.active_counts };
+  } else if (rid) {
+    const counts = { ...(rewards.active_counts || {}) };
+    const key = String(rid);
+    counts[key] = Number(counts[key] ?? counts[rid] ?? 0) + 1;
+    rewards.active_counts = counts;
+  }
+
+  let purchases = Array.isArray(res?.active_purchases)
+    ? [...res.active_purchases]
+    : [...(rewards.active_purchases || [])];
+
+  const purchaseId = Number(res?.purchase_id || res?.purchase?.id || 0);
+  if (purchaseId && rid && !purchases.some((p) => Number(p?.id || 0) === purchaseId)) {
+    purchases.push({
+      id: purchaseId,
+      reward_id: rid,
+      title: reward?.title || '',
+      icon: reward?.icon || '',
+      points_cost: Number(reward?.points_cost || 0),
+    });
+  }
+  rewards.active_purchases = purchases;
+
+  return {
+    ...prev,
+    points_balance: res?.points_balance ?? prev.points_balance,
+    points_today: res?.points_today ?? prev.points_today,
+    rewards,
+  };
 };
 
 const childRewardsSorted = computed(() => {
@@ -430,14 +487,17 @@ const purchaseReward = async (reward) => {
   purchaseLoading.value = reward.id;
   try {
     const res = await api.purchaseReward(effectiveChildId.value, reward.id);
+    applyChildOverviewPatch((prev) => mergePurchaseResult(prev, reward, res));
     if (childData.value) {
-      if (res.points_balance !== undefined) {
-        childData.value.points_balance = res.points_balance;
-      }
-      if (res.active_counts) {
-        childData.value.rewards.active_counts = res.active_counts;
-      }
+      syncChildOverviewSnapshot(effectiveChildId.value, childData.value);
     }
+    await loadChildOverview({ force: true, background: true });
+    emitRuDataChanged({
+      type: 'reward_purchased',
+      childId: String(effectiveChildId.value || ''),
+      points_balance: childData.value?.points_balance,
+      points_today: childData.value?.points_today,
+    });
   } catch (e) {
     alert(e?.message || 'Chyba pri nákupe odmeny');
   } finally {
@@ -451,17 +511,28 @@ const usePurchasedReward = async (reward) => {
   useLoading.value = reward.id;
   try {
     await api.markRewardUsed(purchaseId);
-    if (childData.value?.rewards) {
-      const rewards = childData.value.rewards;
-      const purchases = Array.isArray(rewards.active_purchases) ? rewards.active_purchases : [];
+    applyChildOverviewPatch((prev) => {
+      const rewards = { ...(prev.rewards || {}) };
+      const purchases = Array.isArray(rewards.active_purchases) ? [...rewards.active_purchases] : [];
       rewards.active_purchases = purchases.filter((p) => Number(p?.id || 0) !== Number(purchaseId));
 
-      const counts = rewards.active_counts || {};
+      const counts = { ...(rewards.active_counts || {}) };
       const key = String(reward.id);
-      const prev = Number(counts[key] ?? 0);
-      counts[key] = Math.max(0, prev - 1);
+      const prevCount = Number(counts[key] ?? 0);
+      counts[key] = Math.max(0, prevCount - 1);
       rewards.active_counts = counts;
+
+      return { ...prev, rewards };
+    });
+    if (childData.value) {
+      syncChildOverviewSnapshot(effectiveChildId.value, childData.value);
+      emitRuDataChanged({
+        type: 'reward_used',
+        childId: String(effectiveChildId.value || ''),
+        points_balance: childData.value?.points_balance,
+      });
     }
+    await loadChildOverview({ force: true, background: true });
   } catch (e) {
     alert(e?.message || 'Chyba pri uplatnení odmeny');
   } finally {
@@ -526,10 +597,23 @@ onMounted(() => {
   if (isParent.value) {
     loadData();
     handleQueryActions();
-  } else {
-    loadChildData();
   }
 });
+
+useChildIdLoadTrigger(
+  effectiveChildId,
+  () => {
+    if (!isParent.value) loadChildData();
+  },
+  {
+    appReady: () => props.appReady,
+    onMissing: () => {
+      if (isParent.value) return;
+      childError.value = 'Chýba ID dieťaťa';
+      childLoading.value = false;
+    },
+  }
+);
 
 onActivated(() => {
   if (isParent.value) {
@@ -630,59 +714,109 @@ watch(
     transform: translate3d(8px, 8px, 0);
   }
 }
-.ru-rewards {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 12px;
-}
-.ru-reward-card {
-  border: 1px solid rgba(15, 23, 42, 0.10);
-  border-radius: 16px;
-  padding: 14px;
-  background: #ffffff;
+.ru-task-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+  gap: 10px;
 }
-.ru-reward-card__icon {
-  font-size: 28px;
+.ru-task-item {
+  width: 100%;
+  border: 1px solid rgba(15, 23, 42, 0.10);
+  border-radius: 16px;
+  padding: 12px 14px;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  text-align: left;
+  overflow: hidden;
+}
+.ru-task-item__icon-wrap {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.ru-task-item__icon-wrap--emoji {
+  font-size: 32px;
   line-height: 1;
 }
-.ru-reward-card__title {
-  font-weight: 800;
+.ru-task-item__body {
+  min-width: 0;
+  flex: 1;
 }
-.ru-reward-card__details {
-  color: #475569;
+.ru-task-item__title {
+  font-weight: 600;
+  font-size: 16px;
+  color: #0f172a;
+  line-height: 1.2;
 }
-.ru-reward-card__cost {
-  color: #d69116;
-  font-weight: 700;
+.ru-task-item__desc {
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.25;
+  display: -webkit-box;
+  line-clamp: 2;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
-.ru-reward-card__badge {
-  align-self: flex-start;
+.ru-task-item__points {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
+  gap: 4px;
+  flex-shrink: 0;
+  align-self: flex-start;
+  padding-top: 2px;
+}
+.ru-task-item__points-value {
+  font-weight: 700;
+  font-size: 16px;
+  color: #0f172a;
+}
+.ru-reward-row {
+  cursor: default;
+  align-items: flex-start;
+}
+.ru-reward-row.disabled {
+  opacity: 0.72;
+}
+.ru-reward-row__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.ru-reward-row__actions .ru-btn-buy {
+  margin-top: 0;
+}
+.ru-reward-row__badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
   border-radius: 999px;
   background: #f59e0b;
   color: #ffffff;
   font-weight: 900;
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1;
+  margin-right: 4px;
 }
-.ru-card:not(.ru-admin-card) .ru-reward-card.purchased {
+.ru-card:not(.ru-admin-card) .ru-reward-row.purchased {
   border-color: #f59e0b;
   background: linear-gradient(180deg, #fff7e6 0%, #ffffff 45%);
   box-shadow: 0 10px 24px -16px rgba(245, 158, 11, 0.9);
 }
-.ru-card:not(.ru-admin-card) .ru-reward-card.purchased .ru-reward-card__title {
+.ru-card:not(.ru-admin-card) .ru-reward-row.purchased .ru-task-item__title {
   color: #7c2d12;
-}
-.ru-reward-card__actions {
-  display: flex;
-  gap: 10px;
 }
 
 @media (max-width: 768px) {
@@ -696,17 +830,6 @@ watch(
     width: 124px;
     height: 124px;
   }
-  /* Child rewards: 2 cards per row on mobile */
-  .ru-card:not(.ru-admin-card) .ru-rewards {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  /* Parent/admin rewards: 2 cards per row on mobile */
-  .ru-card.ru-admin-card .ru-rewards {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .ru-card:not(.ru-admin-card) .ru-reward-card__icon {
-    font-size: 44px;
-  }
   .ru-fab {
     width: 56px;
     height: 56px;
@@ -718,12 +841,6 @@ watch(
   .ru-fab__list {
     width: 16px;
     height: 16px;
-  }
-}
-
-@media (max-width: 360px) {
-  .ru-rewards {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

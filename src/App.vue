@@ -1,85 +1,113 @@
 <template>
-  <div class="ru-app" :class="{ 'is-login': isLoginRoute, 'is-kiosk': isKiosk }">
-    <header class="ru-app__header" v-if="!isLoginRoute && !isKiosk">
+  <div
+    class="ru-app notranslate"
+    translate="no"
+    :class="[`ru-theme-${visualTheme}`, { 'is-login': isLoginLike, 'is-kiosk': isKiosk }]"
+  >
+    <header class="ru-app__header" v-if="showAppShell">
       <div class="ru-app__brand">
-        <img :src="logoWhiteUrl" alt="ekidio" />
+        <img v-if="isStanoTheme" :src="logoDarkUrl" alt="ekidio" />
+        <img v-else :src="logoWhiteUrl" alt="ekidio" />
       </div>
       <nav class="ru-app__nav desktop-only">
         <template v-if="isParent">
-          <RouterLink to="/" class="ru-nav__item" @click="onOverviewNavClick">Prehľad</RouterLink>
-          <RouterLink to="/family" class="ru-nav__item">Rodina</RouterLink>
-          <RouterLink to="/tasks" class="ru-nav__item">Úlohy</RouterLink>
-          <RouterLink to="/rewards" class="ru-nav__item">Odmeny</RouterLink>
-          <RouterLink to="/settings" class="ru-nav__item">Nastavenia</RouterLink>
+          <RouterLink to="/" class="ru-nav__item" @click="onOverviewNavClick">{{ t('nav.overview') }}</RouterLink>
+          <RouterLink to="/family" class="ru-nav__item">{{ t('nav.family') }}</RouterLink>
+          <RouterLink to="/tasks" class="ru-nav__item">{{ t('nav.tasks') }}</RouterLink>
+          <RouterLink to="/rewards" class="ru-nav__item">{{ t('nav.rewards') }}</RouterLink>
+          <template v-if="isStanoTheme">
+            <img class="ru-nav__divider" alt="" src="./images/Line.svg" />
+            <RouterLink to="/settings" class="ru-nav__item ru-nav__item-icon">
+              <img alt="" src="./images/settings.svg" />
+            </RouterLink>
+          </template>
+          <RouterLink v-else to="/settings" class="ru-nav__item">{{ t('nav.settings') }}</RouterLink>
         </template>
         <template v-else>
-          <RouterLink to="/" class="ru-nav__item">Úlohy</RouterLink>
-          <RouterLink to="/rewards" class="ru-nav__item">Odmeny</RouterLink>
-          <RouterLink to="/settings" class="ru-nav__item">Nastavenia</RouterLink>
+          <RouterLink to="/" class="ru-nav__item">{{ t('nav.tasks') }}</RouterLink>
+          <RouterLink to="/rewards" class="ru-nav__item">{{ t('nav.rewards') }}</RouterLink>
+          <template v-if="isStanoTheme">
+            <img class="ru-nav__divider" alt="" src="./images/Line.svg" />
+            <RouterLink to="/settings" class="ru-nav__item ru-nav__item-icon">
+              <img alt="" src="./images/settings.svg" />
+            </RouterLink>
+          </template>
+          <RouterLink v-else to="/settings" class="ru-nav__item">{{ t('nav.settings') }}</RouterLink>
         </template>
       </nav>
       <button class="ru-burger mobile-only" @click="toggleMenu">☰</button>
     </header>
 
     <transition name="slide">
-      <aside class="ru-drawer" v-if="showMenu && !isLoginRoute && !isKiosk">
+      <aside class="ru-drawer" v-if="showMenu && showAppShell">
         <div class="ru-drawer__header">
           <strong>Menu</strong>
           <button class="ru-link" @click="toggleMenu">Zavrieť</button>
         </div>
         <nav class="ru-drawer__nav">
           <template v-if="isParent">
-            <RouterLink to="/" class="ru-nav__item" @click="(e) => { onOverviewNavClick(e); closeMenu(); }">Prehľad</RouterLink>
-            <RouterLink to="/family" class="ru-nav__item" @click="closeMenu">Rodina</RouterLink>
-            <RouterLink to="/tasks" class="ru-nav__item" @click="closeMenu">Úlohy</RouterLink>
-            <RouterLink to="/rewards" class="ru-nav__item" @click="closeMenu">Odmeny</RouterLink>
-            <RouterLink to="/settings" class="ru-nav__item" @click="closeMenu">Nastavenia</RouterLink>
+            <RouterLink to="/" class="ru-nav__item" @click="(e) => { onOverviewNavClick(e); closeMenu(); }">{{ t('nav.overview') }}</RouterLink>
+            <RouterLink to="/family" class="ru-nav__item" @click="closeMenu">{{ t('nav.family') }}</RouterLink>
+            <RouterLink to="/tasks" class="ru-nav__item" @click="closeMenu">{{ t('nav.tasks') }}</RouterLink>
+            <RouterLink to="/rewards" class="ru-nav__item" @click="closeMenu">{{ t('nav.rewards') }}</RouterLink>
+            <RouterLink to="/settings" class="ru-nav__item" @click="closeMenu">{{ t('nav.settings') }}</RouterLink>
           </template>
           <template v-else>
-            <RouterLink to="/" class="ru-nav__item" @click="closeMenu">Úlohy</RouterLink>
-            <RouterLink to="/rewards" class="ru-nav__item" @click="closeMenu">Odmeny</RouterLink>
-            <RouterLink to="/settings" class="ru-nav__item" @click="closeMenu">Nastavenia</RouterLink>
+            <RouterLink to="/" class="ru-nav__item" @click="closeMenu">{{ t('nav.tasks') }}</RouterLink>
+            <RouterLink to="/rewards" class="ru-nav__item" @click="closeMenu">{{ t('nav.rewards') }}</RouterLink>
+            <RouterLink to="/settings" class="ru-nav__item" @click="closeMenu">{{ t('nav.settings') }}</RouterLink>
           </template>
         </nav>
       </aside>
     </transition>
     <transition name="fade">
-      <div class="ru-backdrop" v-if="showMenu && !isLoginRoute && !isKiosk" @click="closeMenu"></div>
+      <div class="ru-backdrop" v-if="showMenu && showAppShell" @click="closeMenu"></div>
     </transition>
 
     <main class="ru-app__main">
-      <div v-if="!isLoginRoute && (!authResolved || !bootstrapped)" class="ru-app__loading">
-        <img class="ru-app__loading-logo" :src="logoGenUrl" alt="ekidio" />
-        <div class="ru-app__spinner" role="status" aria-label="Načítavam"></div>
+      <div v-if="showAppShell && isStanoTheme" class="ru-app__hero">
+        <div class="ru-app__title-wrap">
+          <h1 class="ru-app__title">{{ pageTitle }}</h1>
+        </div>
       </div>
-      <RouterView v-else v-slot="{ Component }">
+      <div class="ru-app__content-wrap">
+      <AppUpdateBanner v-if="showAppShell" />
+      <RouterView v-slot="{ Component }">
         <KeepAlive include="OverviewView,ChildrenView,TasksView,RewardsView,SettingsView">
           <component
-            :is="Component"
-            :role="isParent ? 'parent' : 'child'"
+            :is="Component || RoutePlaceholder"
+            :role="viewRole"
             :child-id="childId"
             :localized="localized"
+            :app-ready="appReady"
           />
         </KeepAlive>
       </RouterView>
+      <div v-if="showSplash" class="ru-app__loading ru-app__loading--overlay">
+        <BrandLogo variant="green" size="lg" />
+        <div class="ru-app__spinner" role="status" :aria-label="t('common.loading')"></div>
+      </div>
+      </div>
     </main>
 
-    <FeedbackFab v-if="!isLoginRoute && !isKiosk" />
+    <FeedbackFab v-if="showAppShell" />
 
     <!-- Mobile bottom navigation (thumb-friendly) -->
-    <nav class="ru-bottom-nav" aria-label="Hlavná navigácia" v-if="!isLoginRoute && !isKiosk">
+    <nav class="ru-bottom-nav" aria-label="Hlavná navigácia" v-if="showAppShell">
       <template v-if="isParent">
         <RouterLink to="/" class="ru-tab" @click="onOverviewNavClick">
-          <span class="ru-tab__icon" aria-hidden="true">
+          <img v-if="isStanoTheme" class="ru-tab__img" src="./images/eki-home.svg" alt="" />
+          <span v-else class="ru-tab__icon" aria-hidden="true">
             <svg class="ru-tab__svg" viewBox="0 0 24 24" fill="none">
               <path d="M3 10.5L12 3l9 7.5" />
               <path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10" />
             </svg>
           </span>
-          <span class="ru-tab__label">Prehľad</span>
+          <span class="ru-tab__label">{{ t('nav.overview') }}</span>
         </RouterLink>
         <RouterLink to="/family" class="ru-tab">
-          <span class="ru-tab__icon" aria-hidden="true">
+          <img v-if="isStanoTheme" class="ru-tab__img" src="./images/eki-group.svg" alt="" />
+          <span v-else class="ru-tab__icon" aria-hidden="true">
             <svg class="ru-tab__svg" viewBox="0 0 24 24" fill="none">
               <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
               <path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" />
@@ -87,19 +115,21 @@
               <path d="M16 3.13a4 4 0 0 1 0 7.75" />
             </svg>
           </span>
-          <span class="ru-tab__label">Rodina</span>
+          <span class="ru-tab__label">{{ t('nav.family') }}</span>
         </RouterLink>
         <RouterLink to="/tasks" class="ru-tab">
-          <span class="ru-tab__icon" aria-hidden="true">
+          <img v-if="isStanoTheme" class="ru-tab__img" src="./images/eki-tasks.svg" alt="" />
+          <span v-else class="ru-tab__icon" aria-hidden="true">
             <svg class="ru-tab__svg" viewBox="0 0 24 24" fill="none">
               <path d="M9 11l3 3 7-7" />
               <path d="M21 12a9 9 0 1 1-5.25-8.16" />
             </svg>
           </span>
-          <span class="ru-tab__label">Úlohy</span>
+          <span class="ru-tab__label">{{ t('nav.tasks') }}</span>
         </RouterLink>
         <RouterLink to="/rewards" class="ru-tab">
-          <span class="ru-tab__icon" aria-hidden="true">
+          <img v-if="isStanoTheme" class="ru-tab__img" src="./images/eki-gift.svg" alt="" />
+          <span v-else class="ru-tab__icon" aria-hidden="true">
             <svg class="ru-tab__svg" viewBox="0 0 24 24" fill="none">
               <path d="M20 12v10H4V12" />
               <path d="M2 7h20v5H2z" />
@@ -108,34 +138,33 @@
               <path d="M12 7h4.5a2.5 2.5 0 1 0 0-5C13 2 12 7 12 7Z" />
             </svg>
           </span>
-          <span class="ru-tab__label">Odmeny</span>
+          <span class="ru-tab__label">{{ t('nav.rewards') }}</span>
         </RouterLink>
         <RouterLink to="/settings" class="ru-tab">
-          <span class="ru-tab__icon" aria-hidden="true">
+          <img v-if="isStanoTheme" class="ru-tab__img" src="./images/eki-settings.svg" alt="" />
+          <span v-else class="ru-tab__icon" aria-hidden="true">
             <svg class="ru-tab__svg" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"
-              />
-              <path
-                d="M19.4 15a7.9 7.9 0 0 0 .06-1 7.9 7.9 0 0 0-.06-1l2.1-1.64a.5.5 0 0 0 .12-.64l-2-3.46a.5.5 0 0 0-.6-.22l-2.48 1a8.03 8.03 0 0 0-1.73-1l-.38-2.65A.5.5 0 0 0 12.93 2h-3.86a.5.5 0 0 0-.5.42l-.38 2.65a8.03 8.03 0 0 0-1.73 1l-2.48-1a.5.5 0 0 0-.6.22l-2 3.46a.5.5 0 0 0 .12.64L3.6 13a7.9 7.9 0 0 0-.06 1 7.9 7.9 0 0 0 .06 1L1.5 16.64a.5.5 0 0 0-.12.64l2 3.46a.5.5 0 0 0 .6.22l2.48-1a8.03 8.03 0 0 0 1.73 1l.38 2.65a.5.5 0 0 0 .5.42h3.86a.5.5 0 0 0 .5-.42l.38-2.65a8.03 8.03 0 0 0 1.73-1l2.48 1a.5.5 0 0 0 .6-.22l2-3.46a.5.5 0 0 0-.12-.64L19.4 15Z"
-              />
+              <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" />
+              <path d="M19.4 15a7.9 7.9 0 0 0 .06-1 7.9 7.9 0 0 0-.06-1l2.1-1.64a.5.5 0 0 0 .12-.64l-2-3.46a.5.5 0 0 0-.6-.22l-2.48 1a8.03 8.03 0 0 0-1.73-1l-.38-2.65A.5.5 0 0 0 12.93 2h-3.86a.5.5 0 0 0-.5.42l-.38 2.65a8.03 8.03 0 0 0-1.73 1l-2.48-1a.5.5 0 0 0-.6.22l-2 3.46a.5.5 0 0 0 .12.64L3.6 13a7.9 7.9 0 0 0-.06 1 7.9 7.9 0 0 0 .06 1L1.5 16.64a.5.5 0 0 0-.12.64l2 3.46a.5.5 0 0 0 .6.22l2.48-1a8.03 8.03 0 0 0 1.73 1l.38 2.65a.5.5 0 0 0 .5.42h3.86a.5.5 0 0 0 .5-.42l.38-2.65a8.03 8.03 0 0 0 1.73-1l2.48 1a.5.5 0 0 0 .6-.22l2-3.46a.5.5 0 0 0-.12-.64L19.4 15Z" />
             </svg>
           </span>
-          <span class="ru-tab__label">Nastavenia</span>
+          <span class="ru-tab__label">{{ t('nav.settings') }}</span>
         </RouterLink>
       </template>
       <template v-else>
         <RouterLink to="/" class="ru-tab">
-          <span class="ru-tab__icon" aria-hidden="true">
+          <img v-if="isStanoTheme" class="ru-tab__img" src="./images/eki-tasks.svg" alt="" />
+          <span v-else class="ru-tab__icon" aria-hidden="true">
             <svg class="ru-tab__svg" viewBox="0 0 24 24" fill="none">
               <path d="M9 11l3 3 7-7" />
               <path d="M21 12a9 9 0 1 1-5.25-8.16" />
             </svg>
           </span>
-          <span class="ru-tab__label">Úlohy</span>
+          <span class="ru-tab__label">{{ t('nav.tasks') }}</span>
         </RouterLink>
         <RouterLink to="/rewards" class="ru-tab">
-          <span class="ru-tab__icon" aria-hidden="true">
+          <img v-if="isStanoTheme" class="ru-tab__img" src="./images/eki-gift.svg" alt="" />
+          <span v-else class="ru-tab__icon" aria-hidden="true">
             <svg class="ru-tab__svg" viewBox="0 0 24 24" fill="none">
               <path d="M20 12v10H4V12" />
               <path d="M2 7h20v5H2z" />
@@ -144,20 +173,17 @@
               <path d="M12 7h4.5a2.5 2.5 0 1 0 0-5C13 2 12 7 12 7Z" />
             </svg>
           </span>
-          <span class="ru-tab__label">Odmeny</span>
+          <span class="ru-tab__label">{{ t('nav.rewards') }}</span>
         </RouterLink>
         <RouterLink to="/settings" class="ru-tab">
-          <span class="ru-tab__icon" aria-hidden="true">
+          <img v-if="isStanoTheme" class="ru-tab__img" src="./images/eki-settings.svg" alt="" />
+          <span v-else class="ru-tab__icon" aria-hidden="true">
             <svg class="ru-tab__svg" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"
-              />
-              <path
-                d="M19.4 15a7.9 7.9 0 0 0 .06-1 7.9 7.9 0 0 0-.06-1l2.1-1.64a.5.5 0 0 0 .12-.64l-2-3.46a.5.5 0 0 0-.6-.22l-2.48 1a8.03 8.03 0 0 0-1.73-1l-.38-2.65A.5.5 0 0 0 12.93 2h-3.86a.5.5 0 0 0-.5.42l-.38 2.65a8.03 8.03 0 0 0-1.73 1l-2.48-1a.5.5 0 0 0-.6.22l-2 3.46a.5.5 0 0 0 .12.64L3.6 13a7.9 7.9 0 0 0-.06 1 7.9 7.9 0 0 0 .06 1L1.5 16.64a.5.5 0 0 0-.12.64l2 3.46a.5.5 0 0 0 .6.22l2.48-1a8.03 8.03 0 0 0 1.73 1l.38 2.65a.5.5 0 0 0 .5.42h3.86a.5.5 0 0 0 .5-.42l.38-2.65a8.03 8.03 0 0 0 1.73-1l2.48 1a.5.5 0 0 0 .6-.22l2-3.46a.5.5 0 0 0-.12-.64L19.4 15Z"
-              />
+              <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" />
+              <path d="M19.4 15a7.9 7.9 0 0 0 .06-1 7.9 7.9 0 0 0-.06-1l2.1-1.64a.5.5 0 0 0 .12-.64l-2-3.46a.5.5 0 0 0-.6-.22l-2.48 1a8.03 8.03 0 0 0-1.73-1l-.38-2.65A.5.5 0 0 0 12.93 2h-3.86a.5.5 0 0 0-.5.42l-.38 2.65a8.03 8.03 0 0 0-1.73 1l-2.48-1a.5.5 0 0 0-.6.22l-2 3.46a.5.5 0 0 0 .12.64L3.6 13a7.9 7.9 0 0 0-.06 1 7.9 7.9 0 0 0 .06 1L1.5 16.64a.5.5 0 0 0-.12.64l2 3.46a.5.5 0 0 0 .6.22l2.48-1a8.03 8.03 0 0 0 1.73 1l.38 2.65a.5.5 0 0 0 .5.42h3.86a.5.5 0 0 0 .5-.42l.38-2.65a8.03 8.03 0 0 0 1.73-1l2.48 1a.5.5 0 0 0 .6-.22l2-3.46a.5.5 0 0 0-.12-.64L19.4 15Z" />
             </svg>
           </span>
-          <span class="ru-tab__label">Nastavenia</span>
+          <span class="ru-tab__label">{{ t('nav.settings') }}</span>
         </RouterLink>
       </template>
     </nav>
@@ -165,11 +191,16 @@
 </template>
 
 <script setup>
-import { computed, ref, onBeforeUnmount, onMounted, KeepAlive } from 'vue';
-import { useRoute, RouterView, RouterLink } from 'vue-router';
+import { computed, ref, onBeforeUnmount, onMounted, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import logoWhiteUrl from './images/logo-white.png';
-import logoGenUrl from './images/logo-gen.png';
+import logoDarkUrl from './images/logo-gen.svg';
+import BrandLogo from './components/BrandLogo.vue';
 import FeedbackFab from './components/FeedbackFab.vue';
+import AppUpdateBanner from './components/AppUpdateBanner.vue';
+import RoutePlaceholder from './components/RoutePlaceholder.vue';
+import { getVisualTheme } from './config/visualTheme';
+import { t } from './i18n';
 import { getToken } from './auth/tokenStorage';
 import { api } from './api/client';
 import { ensureAuthFromMe, getStoredAuth, clearStoredAuth } from './auth/authState';
@@ -196,14 +227,19 @@ const props = defineProps({
 });
 
 const route = useRoute();
+const router = useRouter();
+const visualTheme = getVisualTheme();
+const isStanoTheme = computed(() => visualTheme === 'stano');
 const PARENT_ACCENT = '#5abb6f';
-const runtimeRole = ref(props.role || 'child');
-const runtimeChildId = ref('');
+const storedAuth = getStoredAuth();
+const runtimeRole = ref(storedAuth.role || props.role || 'child');
+const runtimeChildId = ref(storedAuth.childId || '');
 const authResolved = ref(false);
+const isAuthenticated = ref(false);
 const bootstrapped = ref(false);
 
 const childId = computed(() => {
-  const v = props.childId || route.params.childId || '';
+  const v = props.childId || route?.params?.childId || '';
   const raw = (v === 0 || v === '0' ? '' : v) || runtimeChildId.value || '';
   return raw === 0 || raw === '0' ? '' : raw;
 });
@@ -226,6 +262,27 @@ const isParent = computed(() => {
   return false;
 });
 const isLoginRoute = computed(() => route.name === 'login');
+const viewRole = computed(() => {
+  if (!isAuthenticated.value) return props.role || 'child';
+  return isParent.value ? 'parent' : 'child';
+});
+const showSplash = computed(() => {
+  // Login must stay interactive while auth/chunks load (async route components).
+  if (isLoginRoute.value) return false;
+  if (!authResolved.value) return true;
+  if (!isAuthenticated.value) return true;
+  if (!bootstrapped.value) return true;
+  return false;
+});
+const isLoginLike = computed(() => isLoginRoute.value || !authResolved.value);
+const showAppShell = computed(() =>
+  authResolved.value &&
+  isAuthenticated.value &&
+  bootstrapped.value &&
+  !isLoginRoute.value &&
+  !isKiosk.value
+);
+const appReady = computed(() => authResolved.value && bootstrapped.value);
 const isKiosk = computed(() => {
   const cfg = localized.value || {};
   return !!cfg.kiosk || route.name === 'kiosk';
@@ -258,25 +315,47 @@ const applyAccent = (val) => {
 };
 
 let offAuth = null;
-let offAuthBootstrap = null;
 let offDataBootstrap = null;
 
 onBeforeUnmount(() => {
   try { offAuth?.(); } catch {}
-  try { offAuthBootstrap?.(); } catch {}
   try { offDataBootstrap?.(); } catch {}
 });
 
 onMounted(() => {
-  const { role: storedRole, childId: storedChild } = getStoredAuth();
-  if (storedRole) runtimeRole.value = storedRole;
-  if (storedChild) runtimeChildId.value = storedChild;
-
   // React to login/logout without refresh
-  const onAuthChanged = (e) => {
+  const onAuthChanged = async (e) => {
     const detail = e?.detail || {};
-    if (detail.role) runtimeRole.value = detail.role;
-    runtimeChildId.value = detail.childId || '';
+    const token = await getToken();
+    const loggedIn = !!(token && (detail.role === 'parent' || detail.role === 'child'));
+
+    if (!loggedIn && route.name !== 'login') {
+      await router.replace({ name: 'login' });
+    }
+
+    if (loggedIn) {
+      isAuthenticated.value = true;
+      runtimeRole.value = detail.role;
+      runtimeChildId.value = detail.childId || '';
+    } else {
+      isAuthenticated.value = false;
+      runtimeRole.value = 'child';
+      runtimeChildId.value = '';
+      bootstrapped.value = true;
+    }
+    authResolved.value = true;
+
+    if (isAuthenticated.value && isParent.value) {
+      applyAccent(PARENT_ACCENT);
+    }
+
+    clearPreloadCache();
+    if (isAuthenticated.value) {
+      try {
+        await router.isReady();
+      } catch {}
+      await runBootstrap();
+    }
   };
   offAuth = onRuAuthChanged(onAuthChanged);
 
@@ -286,29 +365,42 @@ onMounted(() => {
       const token = await getToken();
       if (!token) {
         clearStoredAuth();
+        isAuthenticated.value = false;
         authResolved.value = true;
         bootstrapped.value = true;
+        if (route.name !== 'login') {
+          await router.replace({ name: 'login' });
+        }
         return;
       }
       const res = await ensureAuthFromMe({ force: false });
       if (res?.loggedIn) {
+        isAuthenticated.value = true;
         runtimeRole.value = res.role || 'child';
         runtimeChildId.value = res.childId || '';
       } else {
+        isAuthenticated.value = false;
         runtimeRole.value = 'child';
         runtimeChildId.value = '';
+        if (route.name !== 'login') {
+          await router.replace({ name: 'login' });
+        }
       }
     } catch (e) {
       clearStoredAuth();
+      isAuthenticated.value = false;
       runtimeRole.value = 'child';
       runtimeChildId.value = '';
+      if (route.name !== 'login') {
+        await router.replace({ name: 'login' });
+      }
     } finally {
       authResolved.value = true;
     }
   })();
 
   const runBootstrap = async () => {
-    if (isLoginRoute.value) {
+    if (!isAuthenticated.value || isLoginRoute.value) {
       bootstrapped.value = true;
       return;
     }
@@ -343,23 +435,65 @@ onMounted(() => {
   };
   waitAuthThenBootstrap();
 
-  // Clear preloaded data when auth or data changes (views will refetch as needed)
-  const onAuthChangedBootstrap = () => {
-    clearPreloadCache();
-    runBootstrap();
+  const onDataChangedBootstrap = (e) => {
+    const type = String(e?.detail?.type || '');
+    const fullResetTypes = new Set([
+      'child_changed',
+      'tasks_imported',
+      'rewards_imported',
+      'reward_changed',
+      'task_deleted',
+      'reset_week',
+      'reset_points',
+      'shift_rotation',
+    ]);
+
+    if (fullResetTypes.has(type)) {
+      clearPreloadCache();
+    }
+
+    // Parent overview should revalidate after child-side task/reward changes.
+    if (
+      type === 'task_status_changed' ||
+      type === 'reward_purchased' ||
+      type === 'reward_used' ||
+      fullResetTypes.has(type)
+    ) {
+      try {
+        localStorage.setItem('ru_overview_stale', '1');
+      } catch {}
+    }
   };
-  const onDataChangedBootstrap = () => {
-    clearPreloadCache();
-    // Make parent overview refetch on next open (KeepAlive keeps component state).
-    try {
-      localStorage.setItem('ru_overview_stale', '1');
-    } catch {}
-  };
-  offAuthBootstrap = onRuAuthChanged(onAuthChangedBootstrap);
   offDataBootstrap = onRuDataChanged(onDataChangedBootstrap);
 
   if (isParent.value) {
     applyAccent(PARENT_ACCENT);
+  }
+});
+
+watch(
+  isLoginLike,
+  (loginLike) => {
+    if (loginLike) applyAccent(PARENT_ACCENT);
+  },
+  { immediate: true }
+);
+
+const pageTitle = computed(() => {
+  switch (route.name) {
+    case 'overview':
+    case 'home':
+      return t('nav.overview');
+    case 'family':
+      return t('nav.family');
+    case 'tasks':
+      return t('nav.tasks');
+    case 'rewards':
+      return t('nav.rewards');
+    case 'settings':
+      return t('nav.settings');
+    default:
+      return t('nav.overview');
   }
 });
 </script>
@@ -369,9 +503,19 @@ onMounted(() => {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   color: #1f2937;
   min-height: 100vh;
+  min-height: 100dvh;
   background: #f3f4f6;
   display: flex;
   flex-direction: column;
+}
+
+/* App shell: lock to viewport, scroll only inside main */
+.ru-app:not(.is-login) {
+  height: 100dvh;
+  max-height: 100dvh;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .ru-app__header {
@@ -397,6 +541,12 @@ onMounted(() => {
 .ru-app__main {
   padding: 0;
   flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  position: relative;
 }
 
 .ru-app__loading {
@@ -413,11 +563,18 @@ onMounted(() => {
   font-weight: 800;
 }
 
-.ru-app__loading-logo {
-  width: 160px;
-  height: auto;
-  display: block;
-  filter: drop-shadow(0 6px 18px rgba(15, 23, 42, 0.12));
+.ru-app__loading--overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2000;
+  min-height: 100%;
+  max-width: none;
+  margin: 0;
+  background: #f3f4f6;
+}
+
+.ru-app.is-login .ru-app__loading {
+  min-height: calc(100dvh - env(safe-area-inset-top, 0px));
 }
 
 .ru-app__spinner {
@@ -507,10 +664,18 @@ onMounted(() => {
     padding-top: env(safe-area-inset-top, 0px);
     padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
   }
-  /* Kiosk: no bottom tabs, use full height */
+  /* Kiosk: no bottom tabs; header handles top safe area */
   .ru-app.is-kiosk:not(.is-login) .ru-app__main {
-    padding-top: max(12px, env(safe-area-inset-top, 12px));
+    padding-top: 0;
     padding-bottom: env(safe-area-inset-bottom, 0px);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .ru-app.is-kiosk:not(.is-login) .ru-app__main > * {
+    flex: 1;
+    min-height: 0;
   }
   /* Login page uses its own full-screen layout, BUT respect top inset */
   .ru-app.is-login .ru-app__main {

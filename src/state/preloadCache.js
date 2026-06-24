@@ -1,3 +1,8 @@
+import { applyWeekendMultiplierFromPayload, clearWeekendMultiplier } from './weekendMultiplier';
+import { getWeekStartForDate } from '../utils/days';
+
+const WEEK_DAYS = [1, 2, 3, 4, 5, 6, 0];
+
 const state = {
   children: null,
   tasks: null,
@@ -23,6 +28,7 @@ export function clearPreloadCache() {
   state.ts.children = 0;
   state.ts.tasks = 0;
   state.ts.rewards = 0;
+  clearWeekendMultiplier();
 }
 
 export function setCachedChildren(list) {
@@ -81,23 +87,34 @@ export function invalidateCachedPointsOverview(childId) {
   state.pointsOverview = next;
 }
 
-export function setCachedOverview(childId, day, payload) {
-  const key = `${String(childId || '')}:${String(day ?? '')}`;
+export function setCachedOverview(childId, day, payload, weekStart = '') {
+  const ws = weekStart || payload?.week_range?.start || getOverviewCacheWeekStart(payload) || '';
+  const key = overviewCacheKey(childId, day, ws);
   if (!key) return;
   state.overview.set(key, { payload, ts: Date.now() });
 }
 
-export function getCachedOverview(childId, day) {
-  const key = `${String(childId || '')}:${String(day ?? '')}`;
+export function getCachedOverview(childId, day, weekStart = '') {
+  const key = overviewCacheKey(childId, day, weekStart);
   const entry = state.overview.get(key) || null;
   return entry && entry.payload ? entry.payload : null;
 }
 
-export function getCachedOverviewAgeMs(childId, day) {
-  const key = `${String(childId || '')}:${String(day ?? '')}`;
+export function getCachedOverviewAgeMs(childId, day, weekStart = '') {
+  const key = overviewCacheKey(childId, day, weekStart);
   const entry = state.overview.get(key) || null;
   if (!entry || !entry.ts) return Number.POSITIVE_INFINITY;
   return Math.max(0, Date.now() - Number(entry.ts));
+}
+
+function getOverviewCacheWeekStart(payload) {
+  return payload?.week_range?.start || payload?.week_start || '';
+}
+
+function overviewCacheKey(childId, day, weekStart = '') {
+  const cid = String(childId || '');
+  if (!cid) return '';
+  return `${cid}:${String(weekStart || '')}:${String(day ?? '')}`;
 }
 
 export function invalidateCachedOverview(childId) {
@@ -107,6 +124,82 @@ export function invalidateCachedOverview(childId) {
     if (!k.startsWith(prefix)) next.set(k, v);
   }
   state.overview = next;
+}
+
+/**
+ * Keep points/rewards in sync across all cached day snapshots for one child.
+ * Task/reward changes affect the whole profile, not just one weekday view.
+ */
+export function syncChildOverviewSnapshot(childId, snapshot) {
+  const cid = String(childId || '');
+  if (!cid || !snapshot || typeof snapshot !== 'object') return;
+
+  const prefix = `${cid}:`;
+  const shared = {
+    points_balance: snapshot.points_balance,
+    points_today: snapshot.points_today,
+    points_week: snapshot.points_week,
+    rewards: snapshot.rewards,
+  };
+
+  for (const [key, entry] of state.overview.entries()) {
+    if (!key.startsWith(prefix) || !entry?.payload) continue;
+    const next = {
+      ...entry.payload,
+      ...shared,
+      rewards: shared.rewards
+        ? { ...(entry.payload.rewards || {}), ...shared.rewards }
+        : entry.payload.rewards,
+    };
+    state.overview.set(key, { payload: next, ts: Date.now() });
+  }
+
+  const day = new Date().getDay();
+  const ws = getOverviewCacheWeekStart(snapshot);
+  setCachedOverview(cid, day, snapshot, ws);
+}
+
+export function patchChildOverviewSnapshot(childId, patchFn) {
+  const cid = String(childId || '');
+  if (!cid || typeof patchFn !== 'function') return null;
+
+  const prefix = `${cid}:`;
+  let latest = null;
+
+  for (const [key, entry] of state.overview.entries()) {
+    if (!key.startsWith(prefix) || !entry?.payload) continue;
+    const next = patchFn({ ...entry.payload });
+    if (!next) continue;
+    state.overview.set(key, { payload: next, ts: Date.now() });
+    latest = next;
+  }
+
+  if (latest) {
+    const ws = getOverviewCacheWeekStart(latest);
+    setCachedOverview(cid, new Date().getDay(), latest, ws);
+  }
+
+  return latest;
+}
+
+/**
+ * Prefetch child overview for all weekdays (background, best-effort).
+ */
+export async function prefetchChildOverviewWeek(childId, api, { weekStart = null, skipDay = null } = {}) {
+  const cid = String(childId || '');
+  if (!cid || !api?.getChildOverview) return;
+  const ws = weekStart || getWeekStartForDate();
+
+  await Promise.allSettled(
+    WEEK_DAYS.filter((day) => day !== skipDay).map(async (day) => {
+      if (getCachedOverview(cid, day, ws)) return;
+      const overview = await api.getChildOverview(cid, day, ws).catch(() => null);
+      if (overview) {
+        setCachedOverview(cid, day, overview, ws);
+        applyWeekendMultiplierFromPayload(overview);
+      }
+    })
+  );
 }
 
 export async function bootstrapPreload({ role, childId, todayDay, api, childrenApi, tasksApi, rewardsApi, pointsApi } = {}) {
@@ -132,11 +225,15 @@ export async function bootstrapPreload({ role, childId, todayDay, api, childrenA
     const preloadPromises = [];
 
     if (effectiveChildId && api?.getChildOverview) {
+      const ws = getWeekStartForDate();
       preloadPromises.push(
         api
-          .getChildOverview(effectiveChildId, day)
+          .getChildOverview(effectiveChildId, day, ws)
           .then((overview) => {
-            if (overview) setCachedOverview(effectiveChildId, day, overview);
+            if (overview) {
+              setCachedOverview(effectiveChildId, day, overview, ws);
+              applyWeekendMultiplierFromPayload(overview);
+            }
           })
           .catch(() => null)
       );
@@ -159,12 +256,22 @@ export async function bootstrapPreload({ role, childId, todayDay, api, childrenA
       await Promise.all(preloadPromises);
     }
 
+    if (effectiveChildId) {
+      prefetchChildOverviewWeek(effectiveChildId, api, { weekStart: getWeekStartForDate(), skipDay: day });
+    }
+
     return;
   }
 
   // child role
   if (String(childId || '') && api?.getChildOverview) {
-    const overview = await api.getChildOverview(String(childId), day).catch(() => null);
-    if (overview) setCachedOverview(String(childId), day, overview);
+    const cid = String(childId);
+    const ws = getWeekStartForDate();
+    const overview = await api.getChildOverview(cid, day, ws).catch(() => null);
+    if (overview) {
+      setCachedOverview(cid, day, overview, ws);
+      applyWeekendMultiplierFromPayload(overview);
+    }
+    prefetchChildOverviewWeek(cid, api, { weekStart: ws, skipDay: day });
   }
 }

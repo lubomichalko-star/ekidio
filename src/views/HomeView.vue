@@ -1,27 +1,29 @@
 <template>
-  <OverviewView
+  <DnesView
     v-if="isParentHome"
     :role="role"
-    :child-id="childId"
     :localized="localized"
+    :app-ready="appReady"
   />
   <ChildView
     v-else
     :role="role"
     :child-id="childId"
     :localized="localized"
+    :app-ready="appReady"
   />
 </template>
 
 <script setup>
 import { computed } from 'vue';
 import ChildView from './ChildView.vue';
-import OverviewView from './OverviewView.vue';
+import DnesView from './DnesView.vue';
 
 const props = defineProps({
   role: { type: String, default: 'child' },
   childId: { type: [String, Number], default: '' },
-  localized: { type: Object, default: () => ({}) }
+  localized: { type: Object, default: () => ({}) },
+  appReady: { type: Boolean, default: false },
 });
 
 const localized = computed(() => props.localized || {});

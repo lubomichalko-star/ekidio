@@ -1,8 +1,8 @@
 <template>
-  <section class="ru-kiosk">
+  <section class="ru-kiosk" @pointerdown="onKioskUserActivity">
     <header class="ru-kiosk__top">
-      <div class="ru-kiosk__brand" aria-hidden="true">
-        <img class="ru-kiosk__logo" :src="logoUrl" alt="" />
+      <div class="ru-kiosk__brand">
+        <img class="ru-kiosk__logo" :src="logoWhiteUrl" alt="ekidio" />
       </div>
 
       <div class="ru-kiosk__title" aria-label="Dátum">
@@ -35,12 +35,13 @@
       </div>
     </header>
 
-    <div class="ru-kiosk__body">
+    <div class="ru-kiosk__content">
       <div class="ru-kiosk__error" v-if="!isParent">
         Prístup len pre rodiča.
       </div>
       <div class="ru-kiosk__error" v-else-if="error">{{ error }}</div>
       <div class="ru-kiosk__loading" v-else-if="loading">Načítavam…</div>
+      <div class="ru-kiosk__empty" v-else-if="!children.length">Žiadne deti na zobrazenie.</div>
 
       <div v-else class="ru-kiosk__carousel">
         <div
@@ -59,6 +60,7 @@
                     :key="c.id"
                     :child="c"
                     :day="todayDay"
+                    @layout-change="syncPovinneAlign"
                   />
                   <div
                     v-for="i in emptyColsForPage(page)"
@@ -107,19 +109,27 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { childrenApi } from '../api/children';
 import KioskChildColumn from '../components/KioskChildColumn.vue';
 import RuModal from '../components/RuModal.vue';
-import logoUrl from '../images/logo-gen.png';
+import { getStoredAuth } from '../auth/authState';
+import { getCachedChildren } from '../state/preloadCache';
+import { isKioskMotionAvailable, notifyKioskUserActivity, startKioskMotion, stopKioskMotion } from '../lib/kioskMotion';
+import { getKioskScreenIdleMs } from '../lib/kioskSettings';
+import logoWhiteUrl from '../images/logo-white.png';
 
 const props = defineProps({
   role: { type: String, default: 'child' },
   childId: { type: [String, Number], default: '' },
   localized: { type: Object, default: () => ({}) },
+  appReady: { type: Boolean, default: false },
 });
 
 const isParent = computed(() => {
+  const stored = getStoredAuth()?.role || '';
+  if (stored === 'parent') return true;
+  if (stored === 'child') return false;
   if (props.role === 'parent') return true;
   if (props.role === 'child') return false;
   return !!(props.localized?.isParent && !props.localized?.forceChild);
@@ -156,6 +166,50 @@ const nextPage = () => goToPage(pageIndex.value + 1);
 
 const emptyColsForPage = (page) => Math.max(0, perPage - (Array.isArray(page) ? page.length : 0));
 const isPageActive = (idx) => Number(idx) === Number(pageIndex.value);
+
+let alignFrame = 0;
+const syncColumnAlign = () => {
+  if (alignFrame) cancelAnimationFrame(alignFrame);
+  alignFrame = requestAnimationFrame(() => {
+    alignFrame = 0;
+    const root = swipeEl.value;
+    if (!root) return;
+
+    const syncBlocks = (selector) => {
+      const blocks = root.querySelectorAll(selector);
+      if (!blocks.length) return;
+      blocks.forEach((el) => {
+        el.style.minHeight = '';
+      });
+      let max = 0;
+      blocks.forEach((el) => {
+        max = Math.max(max, el.offsetHeight);
+      });
+      if (max <= 0) return;
+      const height = `${Math.ceil(max)}px`;
+      blocks.forEach((el) => {
+        el.style.minHeight = height;
+      });
+    };
+
+    syncBlocks('.ru-kiosk-col__group--povinne');
+  });
+};
+
+const syncPovinneAlign = syncColumnAlign;
+
+let alignObserver = null;
+
+watch(pageIndex, () => {
+  nextTick(syncPovinneAlign);
+});
+
+watch(
+  () => children.value.length,
+  () => {
+    nextTick(syncPovinneAlign);
+  }
+);
 
 const todayDay = ref(new Date().getDay());
 
@@ -240,13 +294,21 @@ const confirmExit = async () => {
   } catch {}
 };
 
-// Best-effort: keep tablet screen awake (supported browsers only).
+// Android app: wake screen on front-camera motion, dim after configured idle time.
+// Web / other platforms: keep screen awake when supported.
 let wakeLock = null;
+let kioskMotionActive = false;
+
+const onKioskUserActivity = () => {
+  if (!kioskMotionActive) return;
+  notifyKioskUserActivity();
+};
+
 const tryWakeLock = async () => {
+  if (kioskMotionActive) return;
   try {
     if (!('wakeLock' in navigator)) return;
     if (wakeLock) return;
-    // Some browsers require user gesture; we just try and ignore failures.
     wakeLock = await navigator.wakeLock.request('screen');
     wakeLock.addEventListener?.('release', () => {
       wakeLock = null;
@@ -256,13 +318,57 @@ const tryWakeLock = async () => {
   }
 };
 
+const startScreenPolicy = async () => {
+  if (isKioskMotionAvailable()) {
+    try {
+      wakeLock?.release?.();
+    } catch {}
+    wakeLock = null;
+    const started = await startKioskMotion({ idleTimeoutMs: getKioskScreenIdleMs() });
+    kioskMotionActive = started;
+    return;
+  }
+  await tryWakeLock();
+};
 
-const loadChildren = async () => {
+const stopScreenPolicy = async () => {
+  if (kioskMotionActive) {
+    kioskMotionActive = false;
+    await stopKioskMotion();
+  }
+  try {
+    wakeLock?.release?.();
+  } catch {}
+  wakeLock = null;
+};
+
+
+const loadChildren = async ({ force = false } = {}) => {
+  if (!props.appReady) return;
+
   if (!isParent.value) {
     loading.value = false;
     children.value = [];
     return;
   }
+
+  const cached = getCachedChildren();
+  const hasCached = Array.isArray(cached) && cached.length;
+
+  if (hasCached && !force) {
+    children.value = cached;
+    clampPage();
+    loading.value = false;
+    try {
+      const list = await childrenApi.list();
+      children.value = Array.isArray(list) ? list : [];
+      clampPage();
+    } catch {
+      // keep cached list on background refresh failure
+    }
+    return;
+  }
+
   loading.value = true;
   error.value = '';
   try {
@@ -274,8 +380,26 @@ const loadChildren = async () => {
     error.value = e?.message || 'Chyba pri načítaní detí';
   } finally {
     loading.value = false;
+    nextTick(syncPovinneAlign);
   }
 };
+
+watch(
+  () => [props.appReady, isParent.value],
+  ([ready, parent]) => {
+    if (!ready) {
+      loading.value = true;
+      return;
+    }
+    if (!parent) {
+      loading.value = false;
+      children.value = [];
+      return;
+    }
+    loadChildren();
+  },
+  { immediate: true }
+);
 
 // Swipe handling (visual drag + snap)
 const swipeEl = ref(null);
@@ -399,9 +523,12 @@ const onKeyDown = (e) => {
 
 onMounted(() => {
   syncToday();
-  loadChildren();
-  tryWakeLock();
+  startScreenPolicy();
   updateContainerWidth();
+  try {
+    alignObserver = new ResizeObserver(() => syncPovinneAlign());
+    if (swipeEl.value) alignObserver.observe(swipeEl.value);
+  } catch {}
   try {
     timer = setInterval(syncToday, 60 * 1000);
   } catch {}
@@ -410,13 +537,25 @@ onMounted(() => {
   } catch {}
   try {
     window.addEventListener('resize', updateContainerWidth);
+    window.addEventListener('resize', syncPovinneAlign);
   } catch {}
   try {
-    document.addEventListener('visibilitychange', tryWakeLock);
+    document.addEventListener('visibilitychange', onVisibilityChange);
   } catch {}
 });
 
+const onVisibilityChange = () => {
+  if (kioskMotionActive || isKioskMotionAvailable()) return;
+  tryWakeLock();
+};
+
 onBeforeUnmount(() => {
+  if (alignFrame) cancelAnimationFrame(alignFrame);
+  alignFrame = 0;
+  try {
+    alignObserver?.disconnect();
+  } catch {}
+  alignObserver = null;
   try {
     if (timer) clearInterval(timer);
   } catch {}
@@ -426,35 +565,51 @@ onBeforeUnmount(() => {
   } catch {}
   try {
     window.removeEventListener('resize', updateContainerWidth);
+    window.removeEventListener('resize', syncPovinneAlign);
   } catch {}
   try {
-    document.removeEventListener('visibilitychange', tryWakeLock);
+    document.removeEventListener('visibilitychange', onVisibilityChange);
   } catch {}
-  try {
-    wakeLock?.release?.();
-  } catch {}
-  wakeLock = null;
+  stopScreenPolicy();
 });
 </script>
 
 <style scoped>
 .ru-kiosk {
   width: 100%;
-  max-width: 1600px;
-  margin: 0 auto;
-  padding: 10px 12px;
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .ru-kiosk__top {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: 14px;
-  padding: 8px 12px;
-  border-radius: 16px;
-  background: #ffffff;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+  gap: 16px;
+  padding: calc(16px + env(safe-area-inset-top, 0px)) 20px 16px;
+  background: var(--ru-accent, #5abb6f);
+  color: #ffffff;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.ru-kiosk__content {
+  flex: 1;
+  width: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 12px;
+  box-sizing: border-box;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .ru-kiosk__right {
@@ -467,20 +622,20 @@ onBeforeUnmount(() => {
 .ru-kiosk__brand {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  padding: 0;
+  justify-content: flex-start;
 }
+
 .ru-kiosk__logo {
-  width: 150px;
-  height: auto;
+  height: 40px;
+  width: auto;
   object-fit: contain;
   display: block;
 }
 
 .ru-kiosk__title {
-  font-weight: 900;
-  font-size: 26px;
-  color: #0f172a;
+  font-weight: 800;
+  font-size: clamp(16px, 2.2vw, 22px);
+  color: #ffffff;
   text-align: center;
   line-height: 1.1;
   white-space: nowrap;
@@ -491,72 +646,74 @@ onBeforeUnmount(() => {
 .ru-kiosk__controls {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
-.ru-kiosk__exit {
-  width: 48px;
-  height: 48px;
-  border-radius: 16px;
-  border: 1px solid rgba(15, 23, 42, 0.12);
-  background: #ffffff;
-  color: #0f172a;
-  font-size: 28px;
+.ru-kiosk__exit,
+.ru-kiosk__nav-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  font-size: 26px;
   line-height: 1;
   font-weight: 900;
   cursor: pointer;
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
 }
 
-.ru-kiosk__nav-btn {
-  width: 48px;
-  height: 48px;
-  border-radius: 16px;
-  border: 1px solid rgba(15, 23, 42, 0.12);
-  background: #ffffff;
-  color: #0f172a;
-  font-size: 28px;
-  font-weight: 900;
-  cursor: pointer;
-}
 .ru-kiosk__nav-btn:disabled {
-  opacity: 0.4;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
 .ru-kiosk__dots {
   display: inline-flex;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
 }
+
 .ru-kiosk__dot {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   border-radius: 999px;
   border: 0;
-  background: rgba(15, 23, 42, 0.18);
+  background: rgba(255, 255, 255, 0.35);
   cursor: pointer;
-}
-.ru-kiosk__dot.active {
-  background: var(--ru-accent, #0ea5e9);
+  padding: 0;
 }
 
-.ru-kiosk__body {
-  margin-top: 12px;
+.ru-kiosk__dot.active {
+  background: #ffffff;
 }
 
 .ru-kiosk__carousel {
   width: 100%;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 .ru-kiosk__pages {
   width: 100%;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
-  /* allow vertical scroll in columns; horizontal handled by our track */
   touch-action: pan-y;
+  display: flex;
+  flex-direction: column;
 }
 .ru-kiosk__track {
   display: flex;
   width: 100%;
+  height: 100%;
+  min-height: 0;
   will-change: transform;
 }
 .ru-kiosk__track.dragging {
@@ -565,24 +722,11 @@ onBeforeUnmount(() => {
 .ru-kiosk__page {
   flex: 0 0 100%;
   width: 100%;
+  height: 100%;
+  min-height: 0;
   box-sizing: border-box;
-}
-
-.ru-kiosk__loading,
-.ru-kiosk__error {
-  padding: 18px 14px;
-  background: #ffffff;
-  border-radius: 16px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  font-weight: 800;
-  color: #0f172a;
-}
-.ru-kiosk__error {
-  color: #b91c1c;
-}
-
-.ru-kiosk__pages {
-  width: 100%;
+  display: flex;
+  align-items: stretch;
 }
 
 .ru-kiosk__grid {
@@ -590,20 +734,41 @@ onBeforeUnmount(() => {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
   align-items: stretch;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.ru-kiosk__loading,
+.ru-kiosk__error,
+.ru-kiosk__empty {
+  padding: 18px 14px;
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  font-weight: 800;
+  color: #0f172a;
+  text-align: center;
+}
+
+.ru-kiosk__error {
+  color: #b91c1c;
 }
 
 .ru-kiosk__col--placeholder {
   border: 1px solid rgba(15, 23, 42, 0.06);
   border-radius: 14px;
   background: rgba(15, 23, 42, 0.02);
-  min-height: 70vh;
+  height: 100%;
+  min-height: 0;
 }
 
 .ru-kiosk__col--empty {
   opacity: 0.25;
   border: 2px dashed rgba(15, 23, 42, 0.18);
   border-radius: 14px;
-  min-height: 70vh;
+  height: 100%;
+  min-height: 0;
 }
 
 .ru-kiosk__hint {

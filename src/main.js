@@ -2,10 +2,23 @@ import { createApp } from 'vue';
 import App from './App.vue';
 import router from './router';
 import './styles/ru-base.css';
+import './styles/ru-theme-lubo.css';
+import './styles/ru-theme-stano.css';
+import { initVisualTheme } from './config/visualTheme';
+import { initI18n } from './i18n';
 import { getInitialApiToken } from './config/appConfig';
 import { setToken, getToken } from './auth/tokenStorage';
 import { Capacitor } from '@capacitor/core';
 import { StatusBar, Style } from '@capacitor/status-bar';
+
+// Prevent Chrome / WebView auto-translate from mangling Slovak UI text
+// (e.g. "SO" -> "Severovýchod", "Nakŕmiť" -> "Nakrájať", "Gaming" -> "Hranie hier").
+document.documentElement.lang = 'sk';
+document.documentElement.setAttribute('translate', 'no');
+document.documentElement.classList.add('notranslate');
+
+initI18n();
+initVisualTheme();
 
 const mountEl = document.getElementById('app') || document.getElementById('rodinne-ulohy-app');
 
@@ -41,6 +54,7 @@ if (mountEl) {
       localized: window.rodinneUlohyApp || {}
     });
     app.use(router);
+    await router.isReady();
     app.mount(mountEl);
   })();
 }

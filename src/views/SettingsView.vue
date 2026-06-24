@@ -3,6 +3,7 @@
     class="ru-card"
     :class="{ 'ru-admin-card': isParent }"
     :style="{
+      '--ru-card-max-width': isParent ? '760px' : '560px',
       '--accent': accentColor,
       '--accent-light': accentLight
     }"
@@ -28,41 +29,116 @@
     </header>
 
     <div class="ru-card__body" v-if="isParent">
-      <div class="ru-settings-list">
-        <button class="ru-settings-item" type="button" @click="openPanel('tasks')">
-          <div class="ru-settings-item__main">
-            <div class="ru-settings-item__title">Nastavenia úloh a rotácie</div>
+      <div class="ru-task-list">
+        <button class="ru-task-item" type="button" @click="openPanel('tasks')">
+          <div class="ru-task-item__body">
+            <div class="ru-task-item__title">Nastavenia úloh a rotácie</div>
           </div>
-          <div class="ru-settings-item__chev">›</div>
+          <div class="ru-settings-item__chev" aria-hidden="true">›</div>
         </button>
 
-        <button class="ru-settings-item" type="button" @click="openPanel('kiosk')">
-          <div class="ru-settings-item__main">
-            <div class="ru-settings-item__title">Kiosk režim</div>
+        <button class="ru-task-item" type="button" @click="openPanel('kiosk')">
+          <div class="ru-task-item__body">
+            <div class="ru-task-item__title">Kiosk režim</div>
           </div>
-          <div class="ru-settings-item__chev">›</div>
+          <div class="ru-settings-item__chev" aria-hidden="true">›</div>
         </button>
 
-        <button class="ru-settings-item" type="button" @click="openPanel('profile')">
-          <div class="ru-settings-item__main">
-            <div class="ru-settings-item__title">Profil</div>
+        <button class="ru-task-item" type="button" @click="openPanel('profile')">
+          <div class="ru-task-item__body">
+            <div class="ru-task-item__title">Profil</div>
           </div>
-          <div class="ru-settings-item__chev">›</div>
+          <div class="ru-settings-item__chev" aria-hidden="true">›</div>
         </button>
 
-        <button class="ru-settings-item" type="button" @click="openPanel('about')">
-          <div class="ru-settings-item__main">
-            <div class="ru-settings-item__title">O aplikácii</div>
+        <button class="ru-task-item" type="button" @click="openPanel('language')">
+          <div class="ru-task-item__body">
+            <div class="ru-task-item__title">{{ t('settings.language.title') }}</div>
           </div>
-          <div class="ru-settings-item__chev">›</div>
+          <div class="ru-settings-item__chev" aria-hidden="true">›</div>
+        </button>
+
+        <button class="ru-task-item" type="button" @click="openPanel('about')">
+          <div class="ru-task-item__body">
+            <div class="ru-task-item__title">{{ t('settings.aboutApp.title') }}</div>
+          </div>
+          <div class="ru-settings-item__chev" aria-hidden="true">›</div>
         </button>
         <button class="ru-btn danger ru-btn--sm ru-btn--full" type="button" @click="doLogout">
-          Odhlásiť sa
+          {{ t('nav.logout') }}
+        </button>
+      </div>
+    </div>
+    <div class="ru-card__body" v-else-if="childError">
+      <p class="ru-error">{{ childError }}</p>
+    </div>
+    <div class="ru-card__body" v-else-if="childLoading">
+      <p>Načítavam…</p>
+    </div>
+    <div class="ru-card__body" v-else>
+      <div class="ru-section">
+        <div class="ru-section__header">
+          <h3>Avatar</h3>
+        </div>
+        <div class="ru-avatar-preview">
+          <div class="ru-avatar circle" :style="{ background: accentColor }">
+            <span v-if="!previewAvatar">{{ childDisplay?.name?.charAt(0) || '•' }}</span>
+            <img v-else :src="previewAvatar" alt="avatar" />
+          </div>
+          <p class="ru-card__subtitle">Zmeň si fotku profilu</p>
+          <div class="ru-avatar-actions">
+            <label class="ru-btn ghost ru-file-btn" :class="{ disabled: savingAvatar }">
+              <input type="file" accept="image/*" @change="onFile" :disabled="savingAvatar" />
+              <span>{{ savingAvatar ? 'Nahrávam…' : 'Vybrať fotku' }}</span>
+            </label>
+            <button class="ru-btn ghost danger" v-if="previewAvatar" :disabled="savingAvatar" @click="removeAvatar">
+              Odstrániť
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="ru-section">
+        <div class="ru-section__header">
+          <h3>Farebná škála</h3>
+        </div>
+        <div class="ru-colors">
+          <button
+            v-for="c in palette"
+            :key="c"
+            :style="{ background: c }"
+            :class="{ active: accentColor === c }"
+            @click="setAccent(c)"
+          ></button>
+        </div>
+      </div>
+
+      <div class="ru-task-list">
+        <button class="ru-task-item" type="button" @click="openPanel('language')">
+          <div class="ru-task-item__body">
+            <div class="ru-task-item__title">{{ t('settings.language.title') }}</div>
+          </div>
+          <div class="ru-settings-item__chev" aria-hidden="true">›</div>
+        </button>
+        <button class="ru-task-item" type="button" @click="openPanel('about')">
+          <div class="ru-task-item__body">
+            <div class="ru-task-item__title">{{ t('settings.aboutApp.title') }}</div>
+          </div>
+          <div class="ru-settings-item__chev" aria-hidden="true">›</div>
         </button>
       </div>
 
-      <RuModal v-if="activePanel" :title="panelTitle" @close="closePanel">
-        <div class="ru-settings-modal">
+      <button class="ru-btn danger ru-btn--full" type="button" @click="doLogout">
+        {{ t('nav.logout') }}
+      </button>
+
+      <div class="ru-app-footer">
+        <img :src="logoUrl" alt="ekidio" />
+      </div>
+    </div>
+
+    <RuModal v-if="activePanel" :title="panelTitle" @close="closePanel">
+      <div class="ru-settings-modal">
         <template v-if="activePanel === 'tasks'">
           <div class="ru-section">
             <div class="ru-section__header">
@@ -168,7 +244,6 @@
                 </div>
               </div>
             </div>
-
           </div>
 
           <div class="ru-section">
@@ -220,6 +295,22 @@
                 placeholder="••••"
               />
             </label>
+
+            <label class="ru-field">
+              <span>Čas svietenia displeja bez pohybu (sekundy)</span>
+              <input
+                v-model.number="kioskScreenIdleSec"
+                type="number"
+                :min="kioskScreenIdleMin"
+                :max="kioskScreenIdleMax"
+                inputmode="numeric"
+                @change="saveKioskScreenIdle"
+              />
+            </label>
+            <p class="ru-card__subtitle">
+              Po {{ kioskScreenIdleSec }} s bez dotyku a bez pohybu pred kamerou sa displej vypne.
+              <template v-if="isNativeAndroid">Platí v Android aplikácii.</template>
+            </p>
 
             <p class="ru-form-msg error" v-if="kioskError">{{ kioskError }}</p>
             <p class="ru-form-msg success" v-if="kioskSaved">Uložené.</p>
@@ -300,6 +391,73 @@
               Resetovať odmeny
             </button>
           </div>
+
+          <div class="ru-section">
+            <div class="ru-section__header">
+              <h3>Zrušiť účet</h3>
+            </div>
+            <p class="ru-card__subtitle">
+              Natrvalo vymaže tvoj účet. Ak si správca rodiny, vymažú sa aj všetky rodinné dáta.
+              Táto akcia je nevratná.
+            </p>
+            <label class="ru-field">
+              <span>Aktuálne heslo</span>
+              <input
+                v-model="deleteAccountPassword"
+                type="password"
+                autocomplete="current-password"
+                placeholder="Zadaj heslo pre potvrdenie"
+              />
+            </label>
+            <p class="ru-help subtle">
+              Ak ste sa prihlásili cez Google, nechajte heslo prázdne a nižšie napíšte ZRUŠIŤ.
+            </p>
+            <label class="ru-field">
+              <span>Potvrdenie (Google účet)</span>
+              <input
+                v-model="deleteAccountConfirm"
+                type="text"
+                autocomplete="off"
+                placeholder="ZRUŠIŤ"
+              />
+            </label>
+            <p class="ru-form-msg error" v-if="deleteAccountError">{{ deleteAccountError }}</p>
+            <button
+              class="ru-btn danger ru-btn--full"
+              type="button"
+              @click="deleteAccount"
+              :disabled="deleteAccountLoading"
+            >
+              {{ deleteAccountLoading ? 'Ruším účet…' : 'Zrušiť účet' }}
+            </button>
+          </div>
+        </template>
+
+        <template v-else-if="activePanel === 'language'">
+          <div class="ru-section">
+            <div class="ru-section__header">
+              <h3>{{ t('settings.language.title') }}</h3>
+            </div>
+            <p class="ru-card__subtitle">{{ t('settings.language.desc') }}</p>
+            <div class="ru-lang-switcher">
+              <button
+                type="button"
+                class="ru-btn"
+                :class="{ 'ru-btn--primary': i18nState.locale === 'sk' }"
+                @click="setLocale('sk')"
+              >
+                {{ t('settings.language.sk') }}
+              </button>
+              <button
+                type="button"
+                class="ru-btn"
+                :class="{ 'ru-btn--primary': i18nState.locale === 'en' }"
+                @click="setLocale('en')"
+              >
+                {{ t('settings.language.en') }}
+              </button>
+            </div>
+          </div>
         </template>
 
         <template v-else-if="activePanel === 'about'">
@@ -324,76 +482,43 @@
                 <span class="ru-about__label">Kontakt</span>
                 <a class="ru-about__value ru-about__link" href="mailto:info@ekidio.com">info@ekidio.com</a>
               </div>
+              <div class="ru-about__update" v-if="appUpdateInfo">
+                <p class="ru-about__update-text">
+                  {{ appUpdateInfo.message }}
+                  Dostupná verzia {{ appUpdateInfo.latestVersion }} (máte {{ appUpdateInfo.currentVersion }}).
+                </p>
+                <button class="ru-btn ru-btn--primary ru-btn--full" type="button" @click="goAppDownload">
+                  Stiahnuť novú verziu
+                </button>
+              </div>
             </div>
           </div>
         </template>
-        </div>
-      </RuModal>
-    </div>
-    <div class="ru-card__body" v-else-if="childError">
-      <p class="ru-error">{{ childError }}</p>
-    </div>
-    <div class="ru-card__body" v-else-if="childLoading">
-      <p>Načítavam…</p>
-    </div>
-    <div class="ru-card__body" v-else>
-      <div class="ru-section">
-        <div class="ru-section__header">
-          <h3>Avatar</h3>
-        </div>
-        <div class="ru-avatar-preview">
-          <div class="ru-avatar circle" :style="{ background: accentColor }">
-            <span v-if="!previewAvatar">{{ childDisplay?.name?.charAt(0) || '•' }}</span>
-            <img v-else :src="previewAvatar" alt="avatar" />
-          </div>
-          <p class="ru-card__subtitle">Zmeň si fotku profilu</p>
-          <div class="ru-avatar-actions">
-            <label class="ru-btn ghost ru-file-btn" :class="{ disabled: savingAvatar }">
-              <input type="file" accept="image/*" @change="onFile" :disabled="savingAvatar" />
-              <span>{{ savingAvatar ? 'Nahrávam…' : 'Vybrať fotku' }}</span>
-            </label>
-            <button class="ru-btn ghost danger" v-if="previewAvatar" :disabled="savingAvatar" @click="removeAvatar">
-              Odstrániť
-            </button>
-          </div>
-        </div>
       </div>
-
-      <div class="ru-section">
-        <div class="ru-section__header">
-          <h3>Farebná škála</h3>
-        </div>
-        <div class="ru-colors">
-          <button
-            v-for="c in palette"
-            :key="c"
-            :style="{ background: c }"
-            :class="{ active: accentColor === c }"
-            @click="setAccent(c)"
-          ></button>
-        </div>
-      </div>
-
-      <button class="ru-btn danger ru-btn--full" type="button" @click="doLogout">
-        Odhlásiť sa
-      </button>
-
-      <div class="ru-app-footer">
-        <img :src="logoUrl" alt="ekidio" />
-      </div>
-    </div>
+    </RuModal>
   </section>
 </template>
 
 <script setup>
 import { emitRuDataChanged } from '../events/ruEvents';
 import { computed, onMounted, ref, watch } from 'vue';
-import { useRoute } from 'vue-router';
 import { api } from '../api/client';
 import RuModal from '../components/RuModal.vue';
+import { useEffectiveChildId } from '../composables/useEffectiveChildId';
 import coinPng from '../images/star.png';
 import logoUrl from '../images/logo-gen.png';
-import pkg from '../../package.json';
+import { getAppReleaseVersion } from '../lib/appVersion';
+import { getAvailableAppUpdate, getNativeAppVersion, openDownloadPage } from '../lib/appUpdate';
+import { updateKioskMotionIdleTimeout } from '../lib/kioskMotion';
+import {
+  DEFAULT_KIOSK_SCREEN_IDLE_SEC,
+  getKioskScreenIdleSec,
+  MAX_KIOSK_SCREEN_IDLE_SEC,
+  MIN_KIOSK_SCREEN_IDLE_SEC,
+  setKioskScreenIdleSec,
+} from '../lib/kioskSettings';
+import { Capacitor } from '@capacitor/core';
+import { t, i18nState, setLocale } from '../i18n';
 
 const props = defineProps({
   role: { type: String, default: 'child' },
@@ -401,11 +526,10 @@ const props = defineProps({
   localized: { type: Object, default: () => ({}) },
 });
 
-const route = useRoute();
-
-const effectiveChildId = computed(
-  () => props.childId || route.params.childId || (props.localized?.children?.[0]?.id ?? '')
-);
+const effectiveChildId = useEffectiveChildId({
+  childId: () => props.childId,
+  localized: () => props.localized,
+});
 
 const localizedChildren = computed(() => props.localized?.children || []);
 const childData = ref(null);
@@ -439,22 +563,46 @@ const weekendMultiplier = ref(props.localized?.weekendMultiplier || 3);
 const savingMultiplier = ref(false);
 const shiftingRotation = ref(false);
 const coinIcon = coinPng;
-const appVersion = props.localized?.appVersion || pkg?.version || '0.0.0';
+const nativeAppVersion = ref('');
+const appUpdateInfo = ref(null);
+const appVersion = computed(() => {
+  if (nativeAppVersion.value) return nativeAppVersion.value;
+  return getAppReleaseVersion(props.localized || {});
+});
 const buildVersion = props.localized?.buildVersion ? String(props.localized.buildVersion) : '';
 const appEnv = import.meta?.env?.MODE || 'production';
 
 const activePanel = ref('');
 const openPanel = (key) => {
   activePanel.value = key;
+  if (key === 'kiosk') {
+    loadKioskSettings();
+  }
+  if (key === 'about') {
+    refreshAppUpdateInfo();
+  }
+};
+
+const refreshAppUpdateInfo = async () => {
+  if (!Capacitor.isNativePlatform()) {
+    appUpdateInfo.value = null;
+    return;
+  }
+  appUpdateInfo.value = await getAvailableAppUpdate({ force: true });
+};
+
+const goAppDownload = () => {
+  openDownloadPage(appUpdateInfo.value?.downloadUrl, appUpdateInfo.value?.latestVersion);
 };
 const closePanel = () => {
   activePanel.value = '';
 };
 const panelTitle = computed(() => {
-  if (activePanel.value === 'tasks') return 'Nastavenia úloh a rotácie';
-  if (activePanel.value === 'kiosk') return 'Kiosk režim';
-  if (activePanel.value === 'profile') return 'Profil';
-  if (activePanel.value === 'about') return 'O aplikácii';
+  if (activePanel.value === 'tasks') return t('settings.taskRotationSettings');
+  if (activePanel.value === 'kiosk') return t('settings.kiosk.title');
+  if (activePanel.value === 'profile') return t('settings.profile');
+  if (activePanel.value === 'language') return t('settings.language.title');
+  if (activePanel.value === 'about') return t('settings.aboutApp.title');
   return '';
 });
 
@@ -479,6 +627,10 @@ const kioskEnabled = ref(false);
 const kioskPin = ref('');
 const kioskError = ref('');
 const kioskSaved = ref(false);
+const kioskScreenIdleSec = ref(DEFAULT_KIOSK_SCREEN_IDLE_SEC);
+const kioskScreenIdleMin = MIN_KIOSK_SCREEN_IDLE_SEC;
+const kioskScreenIdleMax = MAX_KIOSK_SCREEN_IDLE_SEC;
+const isNativeAndroid = Capacitor.getPlatform() === 'android';
 
 const sha256Hex = async (input) => {
   const raw = String(input || '');
@@ -498,8 +650,15 @@ const loadKioskSettings = () => {
   } catch {
     kioskEnabled.value = false;
   }
+  kioskScreenIdleSec.value = getKioskScreenIdleSec();
   // Do not load PIN back (security): user must retype to change it.
   kioskPin.value = '';
+};
+
+const saveKioskScreenIdle = async () => {
+  const saved = setKioskScreenIdleSec(kioskScreenIdleSec.value);
+  kioskScreenIdleSec.value = saved;
+  await updateKioskMotionIdleTimeout(saved);
 };
 
 const saveKioskPinOnly = async () => {
@@ -523,6 +682,7 @@ const saveKioskPinOnly = async () => {
     return;
   }
   if (!pin) {
+    await saveKioskScreenIdle();
     kioskSaved.value = true;
     return;
   }
@@ -537,6 +697,7 @@ const saveKioskPinOnly = async () => {
     kioskError.value = 'Nepodarilo sa uložiť PIN.';
     return;
   }
+  await saveKioskScreenIdle();
   kioskSaved.value = true;
 };
 
@@ -565,6 +726,8 @@ const startKiosk = async () => {
   if (pin) {
     await saveKioskPinOnly();
     if (kioskError.value) return;
+  } else {
+    await saveKioskScreenIdle();
   }
 
   try {
@@ -580,6 +743,41 @@ const startKiosk = async () => {
 const resetLoading = ref(false);
 const resetError = ref('');
 const resetSuccess = ref('');
+
+const deleteAccountPassword = ref('');
+const deleteAccountConfirm = ref('');
+const deleteAccountLoading = ref(false);
+const deleteAccountError = ref('');
+
+const deleteAccount = async () => {
+  if (deleteAccountLoading.value) return;
+  deleteAccountError.value = '';
+
+  if (
+    !confirm(
+      'Naozaj chcete natrvalo zrušiť účet? Táto akcia je nevratná.'
+    )
+  ) {
+    return;
+  }
+  if (!confirm('Posledná šanca. Naozaj zrušiť účet?')) return;
+
+  deleteAccountLoading.value = true;
+  try {
+    await api.deleteParentAccount({
+      currentPassword: deleteAccountPassword.value,
+      confirmText: deleteAccountConfirm.value,
+    });
+    deleteAccountPassword.value = '';
+    deleteAccountConfirm.value = '';
+    await api.logout();
+    window.location.reload();
+  } catch (e) {
+    deleteAccountError.value = e?.message || 'Účet sa nepodarilo zrušiť';
+  } finally {
+    deleteAccountLoading.value = false;
+  }
+};
 
 const saveParentPassword = async () => {
   passwordError.value = '';
@@ -834,7 +1032,10 @@ const saveTaskSettings = async () => {
   }
 };
 
-onMounted(() => {
+onMounted(async () => {
+  if (Capacitor.isNativePlatform()) {
+    nativeAppVersion.value = await getNativeAppVersion();
+  }
   if (!isParent.value) {
     loadChild();
   } else {
@@ -905,6 +1106,10 @@ watch(
 
 .ru-settings-modal .ru-section__header {
   margin-bottom: 10px;
+}
+
+.ru-settings-modal .ru-btn {
+  margin-top: 8px;
 }
 
 .ru-settings-modal .ru-field {
@@ -1064,33 +1269,41 @@ watch(
   border-radius: 10px;
 }
 
-.ru-settings-list {
+.ru-task-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
-.ru-settings-item {
+.ru-task-item {
   width: 100%;
   border: 1px solid rgba(15, 23, 42, 0.10);
   border-radius: 16px;
-  padding: 16px 16px;
+  padding: 12px 14px;
   background: #ffffff;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
   display: flex;
+  flex-direction: row;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
   cursor: pointer;
   text-align: left;
+  overflow: hidden;
 }
-.ru-settings-item__title {
-  font-weight: 800;
+.ru-task-item__body {
+  min-width: 0;
+  flex: 1;
+}
+.ru-task-item__title {
+  font-weight: 600;
+  font-size: 16px;
   color: #0f172a;
+  line-height: 1.2;
 }
 .ru-settings-item__chev {
   color: #94a3b8;
   font-size: 22px;
   line-height: 1;
+  flex-shrink: 0;
 }
 
 .ru-kiosk-actions {
@@ -1138,6 +1351,18 @@ watch(
 .ru-about__link {
   color: var(--ru-accent, #0ea5e9);
   text-decoration: none;
+}
+.ru-about__update {
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+}
+.ru-about__update-text {
+  margin: 0 0 12px;
+  color: #334155;
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 1.45;
 }
 @media (max-width: 640px) {
   .ru-about__row {
@@ -1352,6 +1577,16 @@ watch(
 }
 .ru-rotation-hero__icon rect {
   stroke: var(--ru-accent, #5abb6f);
+}
+
+.ru-lang-switcher {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.ru-lang-switcher .ru-btn {
+  flex: 1;
 }
 </style>
 

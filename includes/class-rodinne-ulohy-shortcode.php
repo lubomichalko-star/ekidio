@@ -78,7 +78,7 @@ class Rodinne_Ulohy_Shortcode {
             // Load Google Font with full Latin support
             wp_enqueue_style(
                 'rodinne-ulohy-fonts',
-                'https://fonts.googleapis.com/css2?family=Patrick+Hand:wght@400&display=swap',
+                'https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Patrick+Hand:wght@400&display=swap',
                 array(),
                 null
             );
@@ -665,6 +665,8 @@ class Rodinne_Ulohy_Shortcode {
         ob_start();
         ?>
         <div id="rodinne-ulohy-app"
+             class="ru-spa-root notranslate"
+             translate="no"
              data-role="child"
              data-child-id="">
         </div>

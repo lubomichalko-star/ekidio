@@ -1,0 +1,475 @@
+{
+  "nav": {
+    "overview": "Overview",
+    "tasks": "Tasks",
+    "rewards": "Rewards",
+    "family": "Family",
+    "settings": "Settings",
+    "logout": "Log out"
+  },
+
+  "days": {
+    "monday": "Monday",
+    "tuesday": "Tuesday",
+    "wednesday": "Wednesday",
+    "thursday": "Thursday",
+    "friday": "Friday",
+    "saturday": "Saturday",
+    "sunday": "Sunday",
+    "short": {
+      "monday": "MO",
+      "tuesday": "TU",
+      "wednesday": "WE",
+      "thursday": "TH",
+      "friday": "FR",
+      "saturday": "SA",
+      "sunday": "SU"
+    }
+  },
+
+  "error": {
+    "cancelTask": "Cancelled task",
+    "reallyDelete2": "Really delete",
+    "conflict": "Conflict while manually moving the task",
+    "rewardFail": "Error loading rewards"
+  },
+
+  "common": {
+    "save": "Save",
+    "saveChanges": "Save changes",
+    "cancel": "Cancel",
+    "close": "Close",
+    "delete": "Delete",
+    "edit": "Edit",
+    "add": "Add",
+    "copy": "Copied",
+    "copyCode": "Copy code",
+    "loading": "Loading...",
+    "uploading": "Uploading...",
+    "adding": "Adding...",
+    "menu": "Menu",
+    "off": "Turn off",
+    "active": "Active",
+    "inactive": "Inactive",
+    "yes": "Yes",
+    "no": "No",
+    "continue": "Continue",
+    "reward": "Reward",
+    "remove": "Remove",
+    "saved": "Saved",
+    "sending": "Sending..."
+  },
+
+  "fields": {
+    "email": "Email",
+    "name": "First name",
+    "surname": "Last name",
+    "avatar": "Avatar",
+    "password": "Password",
+    "passwordAgain": "Password again",
+    "passwordCurrent": "Current password",
+    "passwordNew": "New password",
+    "passwordRepeat": "Enter the new password again",
+    "rewardName": "Reward name",
+    "rewardDescription": "Reward description",
+    "pin": "PIN",
+    "kioskPin": "PIN to turn off",
+    "inviteCode": "Invitation code",
+    "invitePin": "Invitation code (just in case):",
+    "loginPin": "Code for child login to the app",
+    "selectDay": "Choose a day",
+    "selectDay2": "Choose your day",
+    "selectRepeatDays": "Choose repeat days",
+    "selectRewardCategory": "Choose a category",
+    "colorScheme": "Color palette",
+    "codeDesc": "Enter the 6-digit code from the parent app",
+    "inviteSend": "Send invitation"
+  },
+
+  "auth": {
+    "invalidEmail": "Enter a valid email",
+    "login": {
+      "title": "Login",
+      "parentTitle": "Parent login",
+      "childTitle": "Child login",
+      "button": "Log in",
+      "logging": "Logging in...",
+      "hasAccount": "Do you already have an account?",
+      "noAccount": "Don't have an account yet?",
+      "createNewAccount": "Create a new account",
+      "back": "‹ Back",
+      "backToLogin": "Back to login"
+    },
+    "register": {
+      "title": "Registration",
+      "desc": "Create a parent account. We will send a verification code to your email",
+      "button": "Register",
+      "creating": "Registering...",
+      "createAccount": "Create account",
+      "yesAccount": "I already have an account"
+    },
+    "google": {
+      "continue": "Continue with Google",
+      "connecting": "Connecting Google",
+      "orContinue": "Or continue with Google"
+    },
+    "forgotPassword": {
+      "title": "Password recovery",
+      "link": "Forgot password?",
+      "sendResetLink": "Send link"
+    },
+    "verify": {
+      "title": "Email verification",
+      "desc": "We sent the verification code to:",
+      "code": "Verification code",
+      "button": "Verify email",
+      "verifying": "Verifying...",
+      "spamCheck": "If you don't see the email, please also check spam",
+      "sendAgain": "Send code again"
+    },
+    "invite": {
+      "title": "I have an invitation",
+      "desc": "Enter the invitation code from the email and set your password",
+      "code": "Invitation code",
+      "activate": "Activate access",
+      "activating": "Activating..."
+    },
+    "logout": {
+      "confirm": "Do you really want to log out?"
+    }
+  },
+
+  "overview": {
+    "title": "Overview",
+    "todayTasks": "Today's tasks",
+    "todaysTotal": "Total points available for this day:",
+    "rewardsReceived": "Earned rewards",
+    "clickToApply": "Click to redeem",
+    "parentOnly": "Parent-only access",
+    "rewardRedeemConfirm": "Do you really want to redeem this reward?",
+    "emptyStates": {
+      "noTasksForChildren": {
+        "title": "You're doing great",
+        "desc": "You have added a child, but you have not created any tasks yet. Create tasks and assign them to your children.",
+        "button": "Add tasks"
+      },
+      "noChildren": {
+        "title": "Getting started",
+        "desc": "You have not added any children yet. First add at least one child, then assign tasks to them.",
+        "buttonAddChild": "Add child",
+        "buttonTasks": "Go to tasks"
+      }
+    },
+    "tasks": {
+      "empty": "has no task assigned for this day"
+    }
+  },
+
+  "points": {
+    "label": "Points",
+    "point": "point",
+    "points": "points",
+    "today": "Points for today",
+    "todayShort": "Today",
+    "last7Days": "Last 7 days",
+    "total": "Total points",
+    "week": "Week",
+    "biweekly": "2 weeks",
+    "monthly": "Monthly",
+    "correction": "Point correction",
+    "edit": "Edit points",
+    "history": "Point history",
+    "historyLast7Days": "Point history (last 7 days)",
+    "noHistory": "No history for the last 7 days",
+    "reason": "Reason",
+    "date": "Date",
+    "desc": "Description",
+    "action": "Action",
+    "completed": "Completed",
+    "remaining": "Remaining"
+  },
+
+  "family": {
+    "title": "Family",
+    "children": "Children",
+    "parents": "Parents / Grandparents",
+    "admin": "Admin",
+    "child": "Child",
+    "prevChildren": "Previous children",
+    "nextChildren": "Next children",
+    "page": "page",
+    "pages": "pages",
+    "addNew": "Add child or parent +",
+    "addChoice": {
+      "title": "Choose what you want to add",
+      "child": "Add child",
+      "parent": "Add parent"
+    },
+    "childModal": {
+      "editTitle": "Edit child",
+      "delete": "Delete child"
+    },
+    "avatar": {
+      "change": "Change profile photo",
+      "choose": "Choose photo",
+      "remove": "Remove"
+    },
+    "emptyStates": {
+      "noOtherMembers": {
+        "desc": "There are no other adult members or sent invitations yet."
+      },
+      "tasksNextStep": {
+        "title": "Continue by adding tasks or choose from the library",
+        "buttonAddTasks": "Add tasks",
+        "buttonLibrary": "Add from library"
+      }
+    },
+    "invites": {
+      "invite": "Invite",
+      "desc": "Enter an email. The invited person will receive an email with an invitation code (valid for 7 days).",
+      "active": "Active invitations",
+      "sent": "Invitation sent",
+      "sentValidUntil": "Invitation sent · valid until",
+      "validUntil": "Valid until:",
+      "cancelConfirm": "Cancel this invitation?",
+      "emailFailedCopyCode": "The email could not be sent. Copy the code and send it manually.",
+      "sendFailed": "The invitation could not be sent",
+      "cancelFailed": "The invitation could not be cancelled"
+    }
+  },
+
+  "tasks": {
+    "title": "Tasks",
+    "required": "Required",
+    "optional": "Optional",
+    "requiredTasks": "Required tasks",
+    "optionalTasks": "Optional tasks",
+    "empty": "No tasks have been added yet",
+    "emptyFilter": "No tasks match the filter",
+    "emptyLibrary": "The task library is empty",
+    "addNew": "Add new task +",
+    "add": "Add task",
+    "edit": "Edit task",
+    "assign": "Assign task",
+    "noRequired": "No required tasks",
+    "noOptional": "No optional tasks",
+    "noRequiredToday": "No required tasks for today",
+    "noOptionalToday": "No optional tasks for today",
+    "library": "Tasks library",
+    "filter": {
+      "abc": "Alphabetical (A-Z)",
+      "pointsMore": "Most points",
+      "pointsLess": "Fewest points"
+    },
+    "form": {
+      "title": "Task name",
+      "desc": "Task description",
+      "required": "Required task",
+      "optional": "Optional task",
+      "lessPoints": "Fewer points",
+      "morePoints": "More points"
+    },
+    "cat": {
+      "required": "Required",
+      "optional": "Optional"
+    }
+  },
+
+  "rewards": {
+    "title": "Rewards",
+    "reward": "Reward",
+    "addNew": "Add new reward +",
+    "add": "Add reward",
+    "edit": "Edit reward",
+    "buyForPoints": "Buy with points",
+    "notEnoughPoints": "You don't have enough points yet",
+    "redeem": "Redeem reward",
+    "library": "Rewards library",
+    "empty": "No rewards have been added yet",
+    "emptyLibrary": "The reward library is empty",
+    "form": {
+      "title": "Reward name",
+      "desc": "Reward description",
+      "cat": "Choose a category"
+    },
+    "categories": {
+      "food": "Treats",
+      "games": "Gaming",
+      "movies": "Movies and cartoons",
+      "joys": "Toys",
+      "money": "Money",
+      "trip": "Trips and experiences",
+      "sport": "Sports and movement",
+      "create": "Creativity",
+      "special": "Special privileges",
+      "surprise": "Surprises",
+      "other": "Other"
+    }
+  },
+
+  "settings": {
+    "title": "Settings",
+    "profile": "Profile",
+    "taskRotationSettings": "Task and rotation settings",
+    "kiosk": {
+      "title": "Kiosk mode",
+      "desc": "Kiosk mode is for a wall-mounted tablet: all children at once, with tasks that can be checked off.",
+      "disablePin": "PIN to turn off (click the X in the top right of the kiosk)",
+      "turnOff": "Turn off Kiosk mode",
+      "turnOffPin": "Enter the PIN to exit kiosk mode",
+      "open": "Open kiosk",
+      "start": "Start kiosk"
+    },
+    "rotation": {
+      "title": "Automatic task rotation",
+      "move": "Move rotation",
+      "season": "Period",
+      "monthlyAlways": "Monthly rotation always runs",
+      "firstDay": "1st day of the month at 00:01",
+      "startDay": "Start day",
+      "setting": "Setting up tasks and rotations"
+    },
+    "penalty": {
+      "title": "Penalty for Saturday required tasks",
+      "multiplier": "Multiplier",
+      "state": "Status:"
+    },
+    "password": {
+      "change": "Change password",
+      "changed": "Password has been changed"
+    },
+    "reset": {
+      "title": "Data reset",
+      "desc": "Warning! This action cannot be undone. It will delete data only for your account.",
+      "children": "Reset children",
+      "tasks": "Reset tasks",
+      "rewards": "Reset rewards"
+    },
+    "aboutApp": {
+      "title": "About the app",
+      "version": "Version",
+      "build": "Build",
+      "environment": "Environment",
+      "contact": "Contact",
+      "email": "info@ekidio.com"
+    },
+    "language": {
+      "title": "Language",
+      "desc": "App interface language",
+      "sk": "Slovenčina",
+      "en": "English"
+    }
+  },
+
+  "kiosk": {
+    "fillPin": "Enter PIN",
+    "emptyPin": "PIN is not set",
+    "failPin": "Incorrect PIN",
+    "failVerifyPin": "Could not verify PIN",
+    "oneChildTask": "The task has only one child",
+    "done": "Done!",
+    "totalPoints": "Total points:",
+    "bought": "Purchased"
+  },
+
+  "success": {
+    "settingsSaved": "Settings have been saved",
+    "rotationMoved": "Rotation has been moved",
+    "rotationSaved": "Rotation settings have been saved",
+    "multiplierSaved": "Multiplier has been saved",
+    "passwordChanged": "Password has been changed",
+    "passwordRecoverySent": "If the entered email is correct, we have sent you an email with instructions",
+    "taskCompleted": "Completed task:",
+    "taskCancelled": "Cancelled task",
+    "resetSuccess": "was successful",
+    "codeSent": "The code has been sent"
+  },
+
+  "confirmations": {
+    "deleteRecord": "Really delete this record?",
+    "deleteItem": "Really delete",
+    "deleteTask": "Really delete this task?",
+    "deleteTaskWithName": "Really delete task",
+    "redeemReward": "Do you really want to redeem this reward?",
+    "moveRotation": "Do you really want to move the rotation? This action will create a new plan and shift rotating tasks.",
+    "reset": "Do you really want to reset",
+    "irreversible": "This action cannot be undone"
+  },
+
+  "errors": {
+    "generic": "Something went wrong",
+    "loadData": "Error loading data",
+    "save": "Error saving",
+    "delete": "Error deleting",
+    "uploadAvatar": "Error uploading avatar",
+    "requiredFields": "Fill in all fields",
+    "nameSurnameEmailRequired": "Fill in first name, last name and email",
+    "passwordMinLength": "Password must be at least 6 characters",
+    "newPasswordMinLength": "New password must be at least 6 characters",
+    "passwordsDoNotMatch": "Passwords do not match",
+    "newPasswordsDoNotMatch": "New passwords do not match",
+    "pinInvalid": "PIN must have 4 to 6 digits",
+    "pinRequired": "Set a PIN first",
+    "emailRequired": "Enter an email first",
+    "resetFailed": "failed",
+    "deleteFail": "Error deleting record",
+    "auth": {
+      "loginFailed": "Login error",
+      "registerFailed": "Registration error",
+      "verifyFailed": "Verification error",
+      "activationFailed": "Invitation activation error",
+      "googleLoadFailed": "Google login could not be loaded",
+      "googleLoginFailed": "Google login error",
+      "googleFinishFailed": "Google login could not be completed",
+      "passwordRecoveryFailed": "Could not send password reset",
+      "codeRequired": "Enter the 6-digit verification code",
+      "inviteCodeRequired": "Enter the invitation code",
+      "codeSendFailed": "The code could not be sent"
+    },
+    "children": {
+      "missingId": "Child ID is missing",
+      "loadFailed": "Error loading children",
+      "loadRotationFailed": "Could not load children for the move",
+      "saveColorFailed": "Error saving color",
+      "saveAvatarFailed": "Error saving avatar"
+    },
+    "tasks": {
+      "loadFailed": "Error loading tasks",
+      "libraryLoadFailed": "Could not load the task library",
+      "importFailed": "Import failed",
+      "selectLibraryTask": "Select at least one task from the library.",
+      "selectChild": "Select at least one child",
+      "selectRepeatDay": "Select at least one repeat day",
+      "manualMoveConflict": "Conflict while manually moving the task",
+      "moveFailed": "Task move failed",
+      "stateChangeFailed": "Error changing status"
+    },
+    "points": {
+      "loadFailed": "Error loading points",
+      "saveFailed": "Error saving points"
+    },
+    "rewards": {
+      "applyFailed": "The reward could not be redeemed",
+      "loadFailed": "Error loading rewards",
+      "saveFailed": "Error saving reward",
+      "deleteFailed": "Error deleting reward",
+      "redeemFailed": "Error buying reward",
+      "libraryLoadFailed": "Could not load the reward library",
+      "selectReward": "Select at least one reward from the library",
+      "applyFailedError": "Error redeeming reward"
+    },
+    "settings": {
+      "saveFailed": "Error saving settings",
+      "rotationMoveFailed": "Error moving rotation",
+      "rotationSaveFailed": "Error saving rotation settings",
+      "multiplierSaveFailed": "Error saving multiplier",
+      "changePasswordFailed": "Password could not be changed",
+      "savePinFailed": "Could not save PIN"
+    },
+    "family": {
+      "inviteEmailFailed": "The email could not be sent. Copy the code and send it manually",
+      "inviteSendFailed": "The invitation could not be sent",
+      "inviteCancelFailed": "The invitation could not be cancelled"
+    }
+  }
+}

@@ -13,7 +13,7 @@ class Rodinne_Ulohy_Database {
 
     // Increment when DB schema/data migrations change.
     // Used to avoid running migrations on every request.
-    private const DB_VERSION = 2;
+    private const DB_VERSION = 3;
     private const DB_VERSION_OPTION = 'rodinne_ulohy_db_version';
     private const DB_MIGRATING_TRANSIENT = 'rodinne_ulohy_db_migrating';
     
@@ -92,6 +92,7 @@ class Rodinne_Ulohy_Database {
             estimated_time int(11) DEFAULT NULL,
             points int(11) DEFAULT NULL,
             rating int(11) DEFAULT NULL,
+            icon varchar(100) DEFAULT NULL,
             created_at datetime DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
             KEY owner_user_id (owner_user_id),
@@ -365,6 +366,11 @@ class Rodinne_Ulohy_Database {
         $has_shared_task = in_array('shared_task', $columns);
         if (!$has_shared_task) {
             $wpdb->query("ALTER TABLE $table_tasks ADD COLUMN shared_task tinyint(1) DEFAULT 0 AFTER rotation_enabled");
+        }
+
+        $has_task_icon = in_array('icon', $columns);
+        if (!$has_task_icon) {
+            $wpdb->query("ALTER TABLE $table_tasks ADD COLUMN icon varchar(100) DEFAULT NULL AFTER rating");
         }
 
         if (!$has_tasks_owner) {
@@ -1125,6 +1131,109 @@ class Rodinne_Ulohy_Database {
         return $wpdb->delete($table, array('id' => intval($id)), array('%d'));
     }
 
+    private static function get_task_library_max_sort_order() {
+        global $wpdb;
+        $table = $wpdb->prefix . 'rodinne_ulohy_task_library';
+        return max(0, intval($wpdb->get_var("SELECT MAX(sort_order) FROM $table")));
+    }
+
+    private static function get_reward_library_max_sort_order() {
+        global $wpdb;
+        $table = $wpdb->prefix . 'rodinne_ulohy_reward_library';
+        return max(0, intval($wpdb->get_var("SELECT MAX(sort_order) FROM $table")));
+    }
+
+    /**
+     * Copy all tasks from a user's family into the global task library.
+     */
+    public static function import_tasks_to_library_from_owner($source_owner_user_id) {
+        $source_owner_user_id = intval($source_owner_user_id);
+        if (!$source_owner_user_id) {
+            return new WP_Error('ru_invalid', __('Neplatný zdrojový používateľ.', 'rodinne-ulohy'));
+        }
+
+        $tasks = self::get_tasks(null, null, $source_owner_user_id);
+        if (empty($tasks)) {
+            return array('imported' => 0);
+        }
+
+        $sort_order = self::get_task_library_max_sort_order();
+        $imported = 0;
+
+        foreach ($tasks as $task) {
+            $name = sanitize_text_field($task->name ?? '');
+            if ($name === '') {
+                continue;
+            }
+
+            $rating = isset($task->rating) && $task->rating !== null ? max(0, intval($task->rating)) : 0;
+            if ($rating === 0 && isset($task->points) && $task->points !== null) {
+                $rating = max(0, intval($task->points));
+            }
+
+            $sort_order++;
+            $saved = self::save_task_library_item(array(
+                'name' => $name,
+                'description' => $task->description ?? '',
+                'task_type' => $task->task_type ?? 'daily',
+                'days_of_week' => $task->days_of_week ?? '',
+                'task_category' => $task->task_category ?? 'povinne',
+                'rotation_enabled' => !empty($task->rotation_enabled) ? 1 : 0,
+                'estimated_time' => isset($task->estimated_time) && $task->estimated_time !== null ? intval($task->estimated_time) : '',
+                'rating' => $rating,
+                'sort_order' => $sort_order,
+            ));
+
+            if ($saved && !is_wp_error($saved)) {
+                $imported++;
+            }
+        }
+
+        return array('imported' => $imported);
+    }
+
+    /**
+     * Copy all rewards from a user's family into the global reward library.
+     */
+    public static function import_rewards_to_library_from_owner($source_owner_user_id) {
+        $source_owner_user_id = intval($source_owner_user_id);
+        if (!$source_owner_user_id) {
+            return new WP_Error('ru_invalid', __('Neplatný zdrojový používateľ.', 'rodinne-ulohy'));
+        }
+
+        self::ensure_rewards_owner_column();
+        $rewards = self::get_rewards($source_owner_user_id);
+        if (empty($rewards)) {
+            return array('imported' => 0);
+        }
+
+        $sort_order = self::get_reward_library_max_sort_order();
+        $imported = 0;
+
+        foreach ($rewards as $reward) {
+            $title = sanitize_text_field($reward->title ?? '');
+            if ($title === '') {
+                continue;
+            }
+
+            $sort_order++;
+            $saved = self::save_reward_library_item(array(
+                'title' => $title,
+                'category' => $reward->category ?? '',
+                'details' => $reward->details ?? '',
+                'icon' => $reward->icon ?? '',
+                'points_cost' => isset($reward->points_cost) ? max(0, intval($reward->points_cost)) : 0,
+                'sort_order' => $sort_order,
+            ));
+
+            if ($saved && !is_wp_error($saved)) {
+                $imported++;
+            }
+        }
+
+        return array('imported' => $imported);
+    }
+
     public static function import_rewards_from_library($target_owner_user_id, $selected_ids = array()) {
         global $wpdb;
 
@@ -1609,6 +1718,11 @@ class Rodinne_Ulohy_Database {
         if (isset($data['rating']) && $data['rating'] !== null && $data['rating'] !== '') {
             $task_data['rating'] = intval($data['rating']);
         }
+        if (array_key_exists('icon', $data)) {
+            $icon = sanitize_text_field($data['icon'] ?? '');
+            $icon = preg_replace('/[^a-zA-Z0-9_-]/', '', $icon);
+            $task_data['icon'] = $icon !== '' ? $icon : null;
+        }
         
         // Build format array based on actual data
         $format = array();
@@ -1919,7 +2033,7 @@ class Rodinne_Ulohy_Database {
         
         if ($owner_user_id) {
             return $wpdb->get_results($wpdb->prepare(
-                "SELECT a.*, t.name as task_name, t.description as task_description, t.task_type as task_type, t.rating as task_rating, t.task_category as task_category
+                "SELECT a.*, t.name as task_name, t.description as task_description, t.task_type as task_type, t.rating as task_rating, t.task_category as task_category, t.icon as task_icon
                 FROM $assignments_table a
                 INNER JOIN $tasks_table t ON a.task_id = t.id
                 INNER JOIN $children_table c ON a.child_id = c.id
@@ -1931,7 +2045,7 @@ class Rodinne_Ulohy_Database {
             ));
         }
         return $wpdb->get_results($wpdb->prepare(
-            "SELECT a.*, t.name as task_name, t.description as task_description, t.task_type as task_type, t.rating as task_rating, t.task_category as task_category
+            "SELECT a.*, t.name as task_name, t.description as task_description, t.task_type as task_type, t.rating as task_rating, t.task_category as task_category, t.icon as task_icon
             FROM $assignments_table a
             INNER JOIN $tasks_table t ON a.task_id = t.id
             WHERE a.child_id = %d AND a.week_start = %s
@@ -2061,6 +2175,26 @@ class Rodinne_Ulohy_Database {
             'start_formatted' => $start->format('d.m.Y'),
             'end_formatted' => $end->format('d.m.Y')
         );
+    }
+
+    /**
+     * Map JS getDay() (0=Sun..6=Sat) to Y-m-d within a week that starts on Monday.
+     */
+    public static function ymd_for_week_day($week_start, $day_w) {
+        $week_start = sanitize_text_field($week_start);
+        $day_w = intval($day_w);
+        $offsets = array(1 => 0, 2 => 1, 3 => 2, 4 => 3, 5 => 4, 6 => 5, 0 => 6);
+        if ($week_start === '' || !isset($offsets[$day_w])) {
+            return '';
+        }
+
+        try {
+            $dt = new DateTime($week_start, wp_timezone());
+            $dt->modify('+' . intval($offsets[$day_w]) . ' days');
+            return $dt->format('Y-m-d');
+        } catch (Exception $e) {
+            return '';
+        }
     }
     
     // Points methods
@@ -2361,6 +2495,31 @@ class Rodinne_Ulohy_Database {
         }
 
         return $last_entry && intval($last_entry->points) > 0;
+    }
+
+    /**
+     * Last task points entry for a child/task on a specific calendar day.
+     */
+    public static function get_last_task_points_entry_for_date($child_id, $task_id, $ymd) {
+        global $wpdb;
+        $history_table = $wpdb->prefix . 'rodinne_ulohy_points_history';
+
+        $child_id = intval($child_id);
+        $task_id = intval($task_id);
+        $ymd = sanitize_text_field($ymd);
+        if (!$child_id || !$task_id || $ymd === '') {
+            return null;
+        }
+
+        return $wpdb->get_row($wpdb->prepare(
+            "SELECT id, points, created_at FROM $history_table
+             WHERE child_id = %d AND task_id = %d AND type = 'task'
+               AND DATE(created_at) = %s
+             ORDER BY created_at DESC, id DESC LIMIT 1",
+            $child_id,
+            $task_id,
+            $ymd
+        ));
     }
     
     /**
@@ -2772,10 +2931,13 @@ class Rodinne_Ulohy_Database {
             ),
             array('%d', '%d', '%d', '%s', '%s')
         );
+
+        $purchase_id = intval($wpdb->insert_id);
         
         return array(
             'reward' => $reward,
             'points_spent' => $cost,
+            'purchase_id' => $purchase_id,
         );
     }
     
@@ -3235,6 +3397,101 @@ class Rodinne_Ulohy_Database {
         return $res !== false;
     }
 
+    public static function revoke_api_tokens_for_subject($subject_type, $subject_id) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'rodinne_ulohy_api_tokens';
+        $subject_type = sanitize_text_field($subject_type);
+        $subject_id = intval($subject_id);
+        if ($subject_id <= 0 || $subject_type === '') return false;
+
+        $wpdb->update(
+            $table,
+            array('revoked' => 1),
+            array(
+                'subject_type' => $subject_type,
+                'subject_id' => $subject_id,
+            ),
+            array('%d'),
+            array('%s', '%d')
+        );
+        return true;
+    }
+
+    public static function revoke_api_tokens_for_owner_children($owner_user_id) {
+        global $wpdb;
+        $owner_user_id = intval($owner_user_id);
+        if (!$owner_user_id) return;
+
+        $children_table = $wpdb->prefix . 'rodinne_ulohy_children';
+        $child_ids = $wpdb->get_col($wpdb->prepare(
+            "SELECT id FROM $children_table WHERE owner_user_id = %d",
+            $owner_user_id
+        ));
+        foreach ($child_ids ?: array() as $child_id) {
+            self::revoke_api_tokens_for_subject('child', intval($child_id));
+        }
+    }
+
+    public static function unlink_family_members($owner_user_id) {
+        $owner_user_id = intval($owner_user_id);
+        if (!$owner_user_id) return;
+
+        $linked = get_users(array(
+            'meta_key' => 'ru_owner_user_id',
+            'meta_value' => $owner_user_id,
+            'fields' => array('ID'),
+            'number' => 100,
+        ));
+
+        foreach ($linked as $user) {
+            $uid = is_object($user) ? intval($user->ID) : intval($user);
+            if ($uid <= 0 || $uid === $owner_user_id) continue;
+            delete_user_meta($uid, 'ru_owner_user_id');
+            self::revoke_api_tokens_for_subject('wp_user', $uid);
+            delete_transient('rodinne_ulohy_api_token_user_' . $uid);
+        }
+    }
+
+    /**
+     * Permanently delete a parent WP account.
+     * Owners also lose all family data; linked adults are unlinked.
+     */
+    public static function delete_wp_user_account($wp_user_id) {
+        $wp_user_id = intval($wp_user_id);
+        if ($wp_user_id <= 0) {
+            return new WP_Error('ru_invalid', __('Neplatný používateľ', 'rodinne-ulohy'));
+        }
+
+        if (!function_exists('wp_delete_user')) {
+            require_once ABSPATH . 'wp-admin/includes/user.php';
+        }
+
+        $owner_user_id = self::resolve_owner_user_id_for_wp_user($wp_user_id);
+        $is_owner = ($owner_user_id === $wp_user_id);
+        $deleted_owner_data = false;
+
+        if ($is_owner) {
+            self::revoke_api_tokens_for_owner_children($owner_user_id);
+            self::clear_all_owner_data($owner_user_id);
+            self::unlink_family_members($owner_user_id);
+            delete_option('rodinne_ulohy_needs_regen_' . $owner_user_id);
+            $deleted_owner_data = true;
+        }
+
+        self::revoke_api_tokens_for_subject('wp_user', $wp_user_id);
+        delete_transient('rodinne_ulohy_api_token_user_' . $wp_user_id);
+
+        $deleted = wp_delete_user($wp_user_id);
+        if (!$deleted) {
+            return new WP_Error('ru_failed', __('Účet sa nepodarilo zrušiť', 'rodinne-ulohy'));
+        }
+
+        return array(
+            'ok' => true,
+            'deleted_owner_data' => $deleted_owner_data,
+        );
+    }
+
     // -----------------------
     // Family invites (invite-only access for additional adults)
     // -----------------------
@@ -3389,6 +3646,539 @@ class Rodinne_Ulohy_Database {
         );
 
         return $res !== false;
+    }
+
+    // -----------------------
+    // Admin export / import (owner-scoped full snapshot)
+    // -----------------------
+    private const OWNER_EXPORT_FORMAT = 'ekidio-owner-export';
+    private const OWNER_EXPORT_VERSION = 1;
+
+    /**
+     * Summary counts for admin UI.
+     */
+    public static function get_owner_data_summary($owner_user_id) {
+        global $wpdb;
+        $owner_user_id = intval($owner_user_id);
+        if (!$owner_user_id) {
+            return array('children' => 0, 'tasks' => 0, 'rewards' => 0);
+        }
+
+        $children_table = $wpdb->prefix . 'rodinne_ulohy_children';
+        $tasks_table = $wpdb->prefix . 'rodinne_ulohy_tasks';
+        $rewards_table = $wpdb->prefix . 'rodinne_ulohy_rewards';
+
+        return array(
+            'children' => intval($wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM $children_table WHERE owner_user_id = %d",
+                $owner_user_id
+            ))),
+            'tasks' => intval($wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM $tasks_table WHERE owner_user_id = %d",
+                $owner_user_id
+            ))),
+            'rewards' => intval($wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM $rewards_table WHERE owner_user_id = %d",
+                $owner_user_id
+            ))),
+        );
+    }
+
+    private static function export_rows($rows) {
+        $out = array();
+        if (empty($rows) || !is_array($rows)) {
+            return $out;
+        }
+        foreach ($rows as $row) {
+            $out[] = (array) $row;
+        }
+        return $out;
+    }
+
+    /**
+     * Export all family data for an owner into a portable JSON structure.
+     */
+    public static function export_owner_data($owner_user_id, $source_wp_user_id = 0) {
+        global $wpdb;
+
+        $owner_user_id = intval($owner_user_id);
+        if (!$owner_user_id) {
+            return new WP_Error('ru_export_invalid', __('Neplatný používateľ pre export.', 'rodinne-ulohy'));
+        }
+
+        $children_table = $wpdb->prefix . 'rodinne_ulohy_children';
+        $tasks_table = $wpdb->prefix . 'rodinne_ulohy_tasks';
+        $packages_table = $wpdb->prefix . 'rodinne_ulohy_packages';
+        $package_children_table = $wpdb->prefix . 'rodinne_ulohy_package_children';
+        $task_children_table = $wpdb->prefix . 'rodinne_ulohy_task_children';
+        $links_table = $wpdb->prefix . 'rodinne_ulohy_task_links';
+        $excl_table = $wpdb->prefix . 'rodinne_ulohy_task_exclusions';
+        $assignments_table = $wpdb->prefix . 'rodinne_ulohy_assignments';
+        $points_balance_table = $wpdb->prefix . 'rodinne_ulohy_points_balance';
+        $points_history_table = $wpdb->prefix . 'rodinne_ulohy_points_history';
+        $rewards_table = $wpdb->prefix . 'rodinne_ulohy_rewards';
+        $reward_purchases_table = $wpdb->prefix . 'rodinne_ulohy_reward_purchases';
+        $invites_table = $wpdb->prefix . 'rodinne_ulohy_invites';
+
+        $children = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM $children_table WHERE owner_user_id = %d ORDER BY sort_order ASC, id ASC",
+            $owner_user_id
+        ));
+        $child_ids = array_values(array_filter(array_map(function ($row) {
+            return intval($row->id ?? 0);
+        }, $children ?: array())));
+
+        $tasks = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM $tasks_table WHERE owner_user_id = %d ORDER BY id ASC",
+            $owner_user_id
+        ));
+        $task_ids = array_values(array_filter(array_map(function ($row) {
+            return intval($row->id ?? 0);
+        }, $tasks ?: array())));
+
+        $packages = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM $packages_table WHERE owner_user_id = %d ORDER BY id ASC",
+            $owner_user_id
+        ));
+        $package_ids = array_values(array_filter(array_map(function ($row) {
+            return intval($row->id ?? 0);
+        }, $packages ?: array())));
+
+        $rewards = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM $rewards_table WHERE owner_user_id = %d ORDER BY id ASC",
+            $owner_user_id
+        ));
+        $reward_ids = array_values(array_filter(array_map(function ($row) {
+            return intval($row->id ?? 0);
+        }, $rewards ?: array())));
+
+        $task_links = array();
+        if (!empty($task_ids)) {
+            $in = implode(',', array_fill(0, count($task_ids), '%d'));
+            $task_links = $wpdb->get_results($wpdb->prepare(
+                "SELECT l.* FROM $links_table l
+                 INNER JOIN $tasks_table t1 ON t1.id = l.task_id
+                 INNER JOIN $tasks_table t2 ON t2.id = l.linked_task_id
+                 WHERE t1.owner_user_id = %d AND t2.owner_user_id = %d",
+                $owner_user_id,
+                $owner_user_id
+            ));
+        }
+
+        $task_exclusions = array();
+        if (!empty($task_ids)) {
+            $task_exclusions = $wpdb->get_results($wpdb->prepare(
+                "SELECT e.* FROM $excl_table e
+                 INNER JOIN $tasks_table t1 ON t1.id = e.task_id
+                 INNER JOIN $tasks_table t2 ON t2.id = e.excluded_task_id
+                 WHERE t1.owner_user_id = %d AND t2.owner_user_id = %d",
+                $owner_user_id,
+                $owner_user_id
+            ));
+        }
+
+        $task_children = array();
+        if (!empty($task_ids)) {
+            $in = implode(',', array_fill(0, count($task_ids), '%d'));
+            $task_children = $wpdb->get_results($wpdb->prepare(
+                "SELECT tc.* FROM $task_children_table tc
+                 INNER JOIN $tasks_table t ON t.id = tc.task_id
+                 WHERE t.owner_user_id = %d",
+                $owner_user_id
+            ));
+        }
+
+        $package_children = array();
+        if (!empty($package_ids)) {
+            $in = implode(',', array_fill(0, count($package_ids), '%d'));
+            $package_children = $wpdb->get_results($wpdb->prepare(
+                "SELECT pc.* FROM $package_children_table pc
+                 INNER JOIN $packages_table p ON p.id = pc.package_id
+                 WHERE p.owner_user_id = %d",
+                $owner_user_id
+            ));
+        }
+
+        $assignments = array();
+        if (!empty($child_ids)) {
+            $in = implode(',', array_fill(0, count($child_ids), '%d'));
+            $assignments = $wpdb->get_results($wpdb->prepare(
+                "SELECT a.* FROM $assignments_table a
+                 INNER JOIN $children_table c ON c.id = a.child_id
+                 WHERE c.owner_user_id = %d",
+                $owner_user_id
+            ));
+        }
+
+        $points_balance = array();
+        $points_history = array();
+        if (!empty($child_ids)) {
+            $in = implode(',', array_fill(0, count($child_ids), '%d'));
+            $points_balance = $wpdb->get_results($wpdb->prepare(
+                "SELECT pb.* FROM $points_balance_table pb
+                 INNER JOIN $children_table c ON c.id = pb.child_id
+                 WHERE c.owner_user_id = %d",
+                $owner_user_id
+            ));
+            $points_history = $wpdb->get_results($wpdb->prepare(
+                "SELECT ph.* FROM $points_history_table ph
+                 INNER JOIN $children_table c ON c.id = ph.child_id
+                 WHERE c.owner_user_id = %d
+                 ORDER BY ph.id ASC",
+                $owner_user_id
+            ));
+        }
+
+        $reward_purchases = array();
+        if (!empty($reward_ids)) {
+            $in = implode(',', array_fill(0, count($reward_ids), '%d'));
+            $reward_purchases = $wpdb->get_results($wpdb->prepare(
+                "SELECT rp.* FROM $reward_purchases_table rp
+                 INNER JOIN $rewards_table r ON r.id = rp.reward_id
+                 WHERE r.owner_user_id = %d
+                 ORDER BY rp.id ASC",
+                $owner_user_id
+            ));
+        }
+
+        $invites = $wpdb->get_results($wpdb->prepare(
+            "SELECT id, owner_user_id, inviter_user_id, email, role, expires_at, revoked, accepted_user_id, accepted_at, created_at
+             FROM $invites_table
+             WHERE owner_user_id = %d
+             ORDER BY id ASC",
+            $owner_user_id
+        ));
+
+        return array(
+            'format' => self::OWNER_EXPORT_FORMAT,
+            'version' => self::OWNER_EXPORT_VERSION,
+            'exported_at' => gmdate('c'),
+            'plugin_version' => defined('RODINNE_ULOHY_VERSION') ? RODINNE_ULOHY_VERSION : '',
+            'source_wp_user_id' => intval($source_wp_user_id),
+            'source_owner_user_id' => $owner_user_id,
+            'needs_regen' => !empty(get_option('rodinne_ulohy_needs_regen_' . $owner_user_id, 0)) ? 1 : 0,
+            'data' => array(
+                'children' => self::export_rows($children),
+                'packages' => self::export_rows($packages),
+                'tasks' => self::export_rows($tasks),
+                'task_links' => self::export_rows($task_links),
+                'task_exclusions' => self::export_rows($task_exclusions),
+                'task_children' => self::export_rows($task_children),
+                'package_children' => self::export_rows($package_children),
+                'assignments' => self::export_rows($assignments),
+                'points_balance' => self::export_rows($points_balance),
+                'points_history' => self::export_rows($points_history),
+                'rewards' => self::export_rows($rewards),
+                'reward_purchases' => self::export_rows($reward_purchases),
+                'invites' => self::export_rows($invites),
+            ),
+        );
+    }
+
+    /**
+     * Delete all plugin data scoped to one owner (used before import replace).
+     */
+    public static function clear_all_owner_data($owner_user_id) {
+        global $wpdb;
+
+        $owner_user_id = intval($owner_user_id);
+        if (!$owner_user_id) {
+            return false;
+        }
+
+        self::reset_tasks_for_owner($owner_user_id);
+        self::reset_rewards_for_owner($owner_user_id);
+        self::reset_children_for_owner($owner_user_id);
+
+        $packages_table = $wpdb->prefix . 'rodinne_ulohy_packages';
+        $package_children_table = $wpdb->prefix . 'rodinne_ulohy_package_children';
+        $invites_table = $wpdb->prefix . 'rodinne_ulohy_invites';
+
+        $package_ids = $wpdb->get_col($wpdb->prepare(
+            "SELECT id FROM $packages_table WHERE owner_user_id = %d",
+            $owner_user_id
+        ));
+        $package_ids = array_values(array_filter(array_map('intval', $package_ids ?: array())));
+        if (!empty($package_ids)) {
+            $in = implode(',', array_fill(0, count($package_ids), '%d'));
+            $wpdb->query($wpdb->prepare("DELETE FROM $package_children_table WHERE package_id IN ($in)", ...$package_ids));
+        }
+        $wpdb->delete($packages_table, array('owner_user_id' => $owner_user_id), array('%d'));
+        $wpdb->delete($invites_table, array('owner_user_id' => $owner_user_id), array('%d'));
+
+        delete_option('rodinne_ulohy_needs_regen_' . $owner_user_id);
+        wp_cache_flush();
+
+        return true;
+    }
+
+    private static function import_pick_row_fields($row, $allowed_fields) {
+        $out = array();
+        if (!is_array($row)) {
+            return $out;
+        }
+        foreach ($allowed_fields as $field) {
+            if (array_key_exists($field, $row)) {
+                $out[$field] = $row[$field];
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Replace all data for target owner with an exported snapshot.
+     */
+    public static function import_owner_data($target_owner_user_id, $payload, $target_wp_user_id = 0) {
+        global $wpdb;
+
+        $target_owner_user_id = intval($target_owner_user_id);
+        $target_wp_user_id = intval($target_wp_user_id);
+        if (!$target_owner_user_id) {
+            return new WP_Error('ru_import_invalid', __('Neplatný cieľový používateľ.', 'rodinne-ulohy'));
+        }
+        if (!is_array($payload)) {
+            return new WP_Error('ru_import_invalid', __('Neplatný importný súbor.', 'rodinne-ulohy'));
+        }
+        if (($payload['format'] ?? '') !== self::OWNER_EXPORT_FORMAT) {
+            return new WP_Error('ru_import_invalid', __('Súbor nie je export z ekidio.', 'rodinne-ulohy'));
+        }
+        if (intval($payload['version'] ?? 0) !== self::OWNER_EXPORT_VERSION) {
+            return new WP_Error('ru_import_invalid', __('Nepodporovaná verzia exportu.', 'rodinne-ulohy'));
+        }
+        if (empty($payload['data']) || !is_array($payload['data'])) {
+            return new WP_Error('ru_import_invalid', __('Export neobsahuje dáta.', 'rodinne-ulohy'));
+        }
+
+        $data = $payload['data'];
+        self::clear_all_owner_data($target_owner_user_id);
+
+        $children_table = $wpdb->prefix . 'rodinne_ulohy_children';
+        $tasks_table = $wpdb->prefix . 'rodinne_ulohy_tasks';
+        $packages_table = $wpdb->prefix . 'rodinne_ulohy_packages';
+        $package_children_table = $wpdb->prefix . 'rodinne_ulohy_package_children';
+        $task_children_table = $wpdb->prefix . 'rodinne_ulohy_task_children';
+        $links_table = $wpdb->prefix . 'rodinne_ulohy_task_links';
+        $excl_table = $wpdb->prefix . 'rodinne_ulohy_task_exclusions';
+        $assignments_table = $wpdb->prefix . 'rodinne_ulohy_assignments';
+        $points_balance_table = $wpdb->prefix . 'rodinne_ulohy_points_balance';
+        $points_history_table = $wpdb->prefix . 'rodinne_ulohy_points_history';
+        $rewards_table = $wpdb->prefix . 'rodinne_ulohy_rewards';
+        $reward_purchases_table = $wpdb->prefix . 'rodinne_ulohy_reward_purchases';
+
+        $child_map = array();
+        $package_map = array();
+        $task_map = array();
+        $reward_map = array();
+        $has_rotation = false;
+
+        foreach ($data['children'] ?? array() as $row) {
+            $old_id = intval($row['id'] ?? 0);
+            $insert = self::import_pick_row_fields($row, array(
+                'sort_order', 'name', 'email', 'password', 'avatar_url', 'color',
+            ));
+            $insert['owner_user_id'] = $target_owner_user_id;
+            $insert['login_code'] = null;
+            if (!empty($row['created_at'])) {
+                $insert['created_at'] = $row['created_at'];
+            }
+
+            $ok = $wpdb->insert($children_table, $insert);
+            if ($ok === false || !$old_id) {
+                continue;
+            }
+            $new_id = intval($wpdb->insert_id);
+            $child_map[$old_id] = $new_id;
+            self::ensure_child_login_code($new_id);
+        }
+
+        foreach ($data['packages'] ?? array() as $row) {
+            $old_id = intval($row['id'] ?? 0);
+            $insert = self::import_pick_row_fields($row, array('name', 'description'));
+            $insert['owner_user_id'] = $target_owner_user_id;
+            if (!empty($row['created_at'])) {
+                $insert['created_at'] = $row['created_at'];
+            }
+            $ok = $wpdb->insert($packages_table, $insert);
+            if ($ok === false || !$old_id) {
+                continue;
+            }
+            $package_map[$old_id] = intval($wpdb->insert_id);
+        }
+
+        foreach ($data['tasks'] ?? array() as $row) {
+            $old_id = intval($row['id'] ?? 0);
+            $insert = self::import_pick_row_fields($row, array(
+                'name', 'description', 'task_type', 'days_of_week', 'task_category',
+                'rotation_enabled', 'shared_task', 'estimated_time', 'points', 'rating',
+            ));
+            $insert['owner_user_id'] = $target_owner_user_id;
+            $package_id = intval($row['package_id'] ?? 0);
+            $insert['package_id'] = ($package_id && !empty($package_map[$package_id])) ? intval($package_map[$package_id]) : null;
+            if (!empty($row['created_at'])) {
+                $insert['created_at'] = $row['created_at'];
+            }
+            $ok = $wpdb->insert($tasks_table, $insert);
+            if ($ok === false || !$old_id) {
+                continue;
+            }
+            $task_map[$old_id] = intval($wpdb->insert_id);
+            if (!empty($row['rotation_enabled'])) {
+                $has_rotation = true;
+            }
+        }
+
+        foreach ($data['task_links'] ?? array() as $row) {
+            $a_old = intval($row['task_id'] ?? 0);
+            $b_old = intval($row['linked_task_id'] ?? 0);
+            if (empty($task_map[$a_old]) || empty($task_map[$b_old])) {
+                continue;
+            }
+            $a = min($task_map[$a_old], $task_map[$b_old]);
+            $b = max($task_map[$a_old], $task_map[$b_old]);
+            $wpdb->query($wpdb->prepare(
+                "INSERT IGNORE INTO $links_table (task_id, linked_task_id) VALUES (%d, %d)",
+                $a,
+                $b
+            ));
+        }
+
+        foreach ($data['task_exclusions'] ?? array() as $row) {
+            $a_old = intval($row['task_id'] ?? 0);
+            $b_old = intval($row['excluded_task_id'] ?? 0);
+            if (empty($task_map[$a_old]) || empty($task_map[$b_old])) {
+                continue;
+            }
+            $a = min($task_map[$a_old], $task_map[$b_old]);
+            $b = max($task_map[$a_old], $task_map[$b_old]);
+            $wpdb->query($wpdb->prepare(
+                "INSERT IGNORE INTO $excl_table (task_id, excluded_task_id) VALUES (%d, %d)",
+                $a,
+                $b
+            ));
+        }
+
+        foreach ($data['task_children'] ?? array() as $row) {
+            $task_id = intval($task_map[intval($row['task_id'] ?? 0)] ?? 0);
+            $child_id = intval($child_map[intval($row['child_id'] ?? 0)] ?? 0);
+            if (!$task_id || !$child_id) {
+                continue;
+            }
+            $insert = array('task_id' => $task_id, 'child_id' => $child_id);
+            if (!empty($row['created_at'])) {
+                $insert['created_at'] = $row['created_at'];
+            }
+            $wpdb->insert($task_children_table, $insert);
+        }
+
+        foreach ($data['package_children'] ?? array() as $row) {
+            $package_id = intval($package_map[intval($row['package_id'] ?? 0)] ?? 0);
+            $child_id = intval($child_map[intval($row['child_id'] ?? 0)] ?? 0);
+            if (!$package_id || !$child_id) {
+                continue;
+            }
+            $insert = array('package_id' => $package_id, 'child_id' => $child_id);
+            if (!empty($row['created_at'])) {
+                $insert['created_at'] = $row['created_at'];
+            }
+            $wpdb->insert($package_children_table, $insert);
+        }
+
+        foreach ($data['assignments'] ?? array() as $row) {
+            $task_id = intval($task_map[intval($row['task_id'] ?? 0)] ?? 0);
+            $child_id = intval($child_map[intval($row['child_id'] ?? 0)] ?? 0);
+            if (!$task_id || !$child_id || empty($row['week_start'])) {
+                continue;
+            }
+            $insert = self::import_pick_row_fields($row, array('week_start', 'status', 'completed_at'));
+            $insert['task_id'] = $task_id;
+            $insert['child_id'] = $child_id;
+            if (!empty($row['created_at'])) {
+                $insert['created_at'] = $row['created_at'];
+            }
+            $wpdb->insert($assignments_table, $insert);
+        }
+
+        foreach ($data['points_balance'] ?? array() as $row) {
+            $child_id = intval($child_map[intval($row['child_id'] ?? 0)] ?? 0);
+            if (!$child_id) {
+                continue;
+            }
+            $insert = array(
+                'child_id' => $child_id,
+                'balance' => intval($row['balance'] ?? 0),
+            );
+            if (!empty($row['updated_at'])) {
+                $insert['updated_at'] = $row['updated_at'];
+            }
+            $wpdb->insert($points_balance_table, $insert);
+        }
+
+        foreach ($data['points_history'] ?? array() as $row) {
+            $child_id = intval($child_map[intval($row['child_id'] ?? 0)] ?? 0);
+            if (!$child_id) {
+                continue;
+            }
+            $insert = self::import_pick_row_fields($row, array(
+                'points', 'week_start', 'reason', 'type', 'created_at',
+            ));
+            $insert['child_id'] = $child_id;
+            $task_id = intval($row['task_id'] ?? 0);
+            $insert['task_id'] = ($task_id && !empty($task_map[$task_id])) ? intval($task_map[$task_id]) : null;
+            $insert['assignment_id'] = null;
+            $wpdb->insert($points_history_table, $insert);
+        }
+
+        foreach ($data['rewards'] ?? array() as $row) {
+            $old_id = intval($row['id'] ?? 0);
+            $insert = self::import_pick_row_fields($row, array(
+                'title', 'category', 'details', 'icon', 'points_cost', 'created_at', 'updated_at',
+            ));
+            $insert['owner_user_id'] = $target_owner_user_id;
+            $ok = $wpdb->insert($rewards_table, $insert);
+            if ($ok === false || !$old_id) {
+                continue;
+            }
+            $reward_map[$old_id] = intval($wpdb->insert_id);
+        }
+
+        foreach ($data['reward_purchases'] ?? array() as $row) {
+            $reward_id = intval($reward_map[intval($row['reward_id'] ?? 0)] ?? 0);
+            $child_id = intval($child_map[intval($row['child_id'] ?? 0)] ?? 0);
+            if (!$reward_id || !$child_id) {
+                continue;
+            }
+            $insert = self::import_pick_row_fields($row, array(
+                'points_spent', 'status', 'expires_at', 'created_at',
+            ));
+            $insert['reward_id'] = $reward_id;
+            $insert['child_id'] = $child_id;
+            $wpdb->insert($reward_purchases_table, $insert);
+        }
+
+        $inviter_user_id = $target_wp_user_id > 0 ? $target_wp_user_id : $target_owner_user_id;
+        foreach ($data['invites'] ?? array() as $row) {
+            if (!empty($row['accepted_at']) || !empty($row['revoked'])) {
+                continue;
+            }
+            $email = sanitize_email($row['email'] ?? '');
+            if ($email === '') {
+                continue;
+            }
+            $role = sanitize_text_field($row['role'] ?? 'parent');
+            self::create_invite($target_owner_user_id, $inviter_user_id, $email, $role);
+        }
+
+        if ($has_rotation || !empty($payload['needs_regen'])) {
+            update_option('rodinne_ulohy_needs_regen_' . $target_owner_user_id, 1, false);
+        }
+
+        wp_cache_flush();
+
+        $summary = self::get_owner_data_summary($target_owner_user_id);
+        return array(
+            'ok' => true,
+            'summary' => $summary,
+        );
     }
 
     // -----------------------

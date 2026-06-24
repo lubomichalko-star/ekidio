@@ -27,18 +27,13 @@
       </div>
     </header>
 
-    <div class="ru-days-bar" v-if="childData?.week_range">
-      <button
-        v-for="d in days"
-        :key="d.value"
-        :class="['ru-day-pill', { active: selectedDay === d.value }]"
-        @click="changeDay(d.value)"
-      >
-        {{ d.label }}
-      </button>
-    </div>
+    <WeekDayBar
+      v-if="childData?.week_range || selectedWeekStart"
+      v-model:selected-day="selectedDay"
+      v-model:week-start="selectedWeekStart"
+    />
 
-    <div class="ru-card__body" v-if="loading">
+    <div class="ru-card__body" v-if="loading && !childData">
       <p>Načítavam…</p>
     </div>
 
@@ -58,6 +53,19 @@
             class="ru-task"
             :class="{ 'is-done': isTaskDone(item) }"
           >
+            <div class="ru-task__icon-wrap">
+              <img
+                v-if="taskIconUrl(item)"
+                :src="taskIconUrl(item)"
+                alt=""
+                class="ru-task__icon"
+              />
+            </div>
+            <div class="ru-task__content">
+              <div class="ru-task__title">{{ item.task_name }}</div>
+              <div class="ru-task__points">{{ taskPointsEarnLabel(item) }}</div>
+              <p v-if="item.description" class="ru-task__desc">{{ item.description }}</p>
+            </div>
             <label v-if="isToday" class="ru-task__check">
               <input
                 type="checkbox"
@@ -68,15 +76,6 @@
               <span></span>
             </label>
             <div v-else class="ru-task__status-dot" :class="{ done: isTaskDone(item) }"></div>
-            <div class="ru-task__content">
-              <div class="ru-task__row">
-                <div class="ru-task__title">{{ item.task_name }}</div>
-                <div class="ru-task__points">
-                  {{ pointLabel(item, true) }} <img :src="coinIcon" alt="coin" class="ru-coin" />
-                </div>
-              </div>
-              <p v-if="item.description" class="ru-task__desc">{{ item.description }}</p>
-            </div>
           </div>
         </div>
         <p v-else class="ru-empty">Žiadne povinné úlohy na dnes.</p>
@@ -93,6 +92,19 @@
             class="ru-task"
             :class="{ 'is-done': isTaskDone(item) }"
           >
+            <div class="ru-task__icon-wrap">
+              <img
+                v-if="taskIconUrl(item)"
+                :src="taskIconUrl(item)"
+                alt=""
+                class="ru-task__icon"
+              />
+            </div>
+            <div class="ru-task__content">
+              <div class="ru-task__title">{{ item.task_name }}</div>
+              <div class="ru-task__points">{{ taskPointsEarnLabel(item) }}</div>
+              <p v-if="item.description" class="ru-task__desc">{{ item.description }}</p>
+            </div>
             <label v-if="isToday" class="ru-task__check">
               <input
                 type="checkbox"
@@ -103,15 +115,6 @@
               <span></span>
             </label>
             <div v-else class="ru-task__status-dot" :class="{ done: isTaskDone(item) }"></div>
-            <div class="ru-task__content">
-              <div class="ru-task__row">
-                <div class="ru-task__title">{{ item.task_name }}</div>
-                <div class="ru-task__points">
-                  {{ pointLabel(item, false) }} <img :src="coinIcon" alt="coin" class="ru-coin" />
-                </div>
-              </div>
-              <p v-if="item.description" class="ru-task__desc">{{ item.description }}</p>
-            </div>
           </div>
         </div>
         <p v-else class="ru-empty">Žiadne dobrovoľné úlohy na dnes.</p>
@@ -152,10 +155,18 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { api } from '../api/client';
 import coinPng from '../images/star.png';
-import { setCachedOverview } from '../state/preloadCache';
-import { DAYS_SHORT_SK, DAY_ORDER, isDayPastOrToday } from '../utils/days';
-import { pointLabel as pointLabelUtil } from '../utils/points';
+import { getTaskIconUrl } from '../lib/taskIcons';
+import { setCachedOverview, syncChildOverviewSnapshot } from '../state/preloadCache';
+import WeekDayBar from '../components/WeekDayBar.vue';
+import {
+  getWeekStartForDate,
+  isYmdPastOrToday,
+  toYmd,
+  ymdForWeekDay,
+} from '../utils/days';
+import { taskPointsEarnLabel } from '../utils/points';
 import { useChildOverview } from '../composables/useChildOverview';
+import { useEffectiveChildId, useChildIdLoadTrigger } from '../composables/useEffectiveChildId';
 import { emitRuDataChanged } from '../events/ruEvents';
 
 const safeLsGet = (key) => {
@@ -178,28 +189,31 @@ const props = defineProps({
   localized: {
     type: Object,
     default: () => ({})
-  }
+  },
+  appReady: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const route = useRoute();
-const effectiveChildId = computed(
-  () => props.childId || route.params.childId || (props.localized?.children?.[0]?.id ?? '')
-);
+const localized = computed(() => props.localized || {});
+const effectiveChildId = useEffectiveChildId({
+  childId: computed(() => props.childId),
+  route,
+  localized,
+});
 const todayDay = ref(new Date().getDay()); // 0 = NE
+const selectedWeekStart = ref(getWeekStartForDate());
 const selectedDay = ref(todayDay.value);
-const days = DAYS_SHORT_SK;
-const isToday = computed(() => Number(selectedDay.value) === Number(todayDay.value));
-const isDayPastOrTodayLocal = (day) => isDayPastOrToday(day, todayDay.value);
+const isToday = computed(() => ymdForSelectedDay() === toYmd(new Date()));
+const isDayPastOrTodayLocal = (day) => isYmdPastOrToday(ymdForWeekDay(selectedWeekStart.value, day));
 const isFutureSelected = computed(() => !isDayPastOrTodayLocal(selectedDay.value));
 
 const loading = ref(true);
 const error = ref('');
 const childData = ref(null);
 const purchaseLoading = ref(null); // legacy, rewards moved to /rewards
-const weekendMultiplier = computed(() =>
-  Number(props.localized?.weekendMultiplier) > 0 ? Number(props.localized.weekendMultiplier) : 1
-);
-
 const { load: loadOverview } = useChildOverview({
   api,
   dataRef: childData,
@@ -209,28 +223,17 @@ const { load: loadOverview } = useChildOverview({
   revalidateMs: 8000,
 });
 
-async function loadData() {
-  await loadOverview({ childId: effectiveChildId.value, day: selectedDay.value });
-}
-
-function toYmd(d) {
-  if (!(d instanceof Date) || Number.isNaN(d.getTime())) return '';
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+async function loadData({ background = false } = {}) {
+  await loadOverview({
+    childId: effectiveChildId.value,
+    day: selectedDay.value,
+    weekStart: selectedWeekStart.value,
+    background: background || !!childData.value,
+  });
 }
 
 function ymdForSelectedDay() {
-  const start = childData.value?.week_range?.start || '';
-  if (!start) return '';
-  // week_start is Monday (YYYY-MM-DD). selectedDay uses JS getDay() convention.
-  const base = new Date(`${start}T00:00:00`);
-  const offset = Object.prototype.hasOwnProperty.call(DAY_ORDER, Number(selectedDay.value))
-    ? DAY_ORDER[Number(selectedDay.value)]
-    : 0;
-  base.setDate(base.getDate() + offset);
-  return toYmd(base);
+  return ymdForWeekDay(selectedWeekStart.value, selectedDay.value);
 }
 
 function parseMysqlDateTime(input) {
@@ -298,7 +301,7 @@ async function toggleStatus(item) {
     // Update cached overview snapshot for this child/day so other pages can reuse it.
     try {
       if (childData.value) {
-        setCachedOverview(effectiveChildId.value, selectedDay.value, childData.value);
+        syncChildOverviewSnapshot(effectiveChildId.value, childData.value);
       }
     } catch {}
     // Mark overview as stale for parent view; refresh on next open (no hard reload).
@@ -309,6 +312,8 @@ async function toggleStatus(item) {
       type: 'task_status_changed',
       childId: String(effectiveChildId.value || ''),
       day: selectedDay.value,
+      points_balance: childData.value?.points_balance,
+      points_today: childData.value?.points_today,
     });
   } catch (e) {
     // Revert optimistic UI if API fails
@@ -318,14 +323,17 @@ async function toggleStatus(item) {
   }
 }
 
-onMounted(() => {
-  if (effectiveChildId.value) {
-    loadData();
-  } else {
-    error.value = 'Chýba ID dieťaťa';
-    loading.value = false;
+useChildIdLoadTrigger(
+  effectiveChildId,
+  () => loadData(),
+  {
+    appReady: () => props.appReady,
+    onMissing: () => {
+      error.value = 'Chýba ID dieťaťa';
+      loading.value = false;
+    },
   }
-});
+);
 
 let dayTimer = null;
 const syncToday = () => {
@@ -336,6 +344,7 @@ const syncToday = () => {
   // If user was effectively on "today", move them to the new day automatically.
   if (Number(selectedDay.value) === prev) {
     selectedDay.value = now;
+    selectedWeekStart.value = getWeekStartForDate();
     loadData();
   }
 };
@@ -358,13 +367,9 @@ onBeforeUnmount(() => {
   try { document.removeEventListener('visibilitychange', syncToday); } catch {}
 });
 
-const changeDay = (day) => {
-  selectedDay.value = day;
-  loadData();
-};
-
-const pointLabel = (item, isMandatory) =>
-  pointLabelUtil(item, isMandatory, selectedDay.value, weekendMultiplier.value);
+watch([selectedDay, selectedWeekStart], () => {
+  loadData({ background: !!childData.value });
+});
 
 // Rewards presunuté na samostatnú stránku /rewards
 
@@ -374,6 +379,7 @@ const accentLight = computed(() => `${accentColor.value}33`);
 const palette = ['#0ea5e9', '#16a34a', '#f97316', '#f59e0b', '#6366f1', '#ec4899', '#8b5cf6', '#0ea35c'];
 const showMenu = ref(false);
 const coinIcon = coinPng;
+const taskIconUrl = (item) => getTaskIconUrl(item?.task_icon || item?.icon || '');
 
 const setAccent = (c) => {
   localAccent.value = c;
@@ -480,14 +486,32 @@ watch(
 
 .ru-task {
   display: flex;
-  gap: 12px;
-  padding: 5px;
+  gap: 24px;
+  padding: 10px 12px;
   border-radius: 15px;
   border: 1px solid rgba(15, 23, 42, 0.10);
   background: #ffffff;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
   margin-bottom: 5px;
   align-items: center;
+  overflow: hidden;
+}
+
+.ru-task__icon-wrap {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.ru-task__icon {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
 }
 
 .ru-task.is-done {
@@ -507,45 +531,16 @@ watch(
 .ru-task__check {
   width: 44px;
   height: 44px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
 }
 
 .ru-task__check input {
   display: none;
 }
 
-.ru-task__check span {
-  width: 20px;
-  height: 20px;
-  border-radius: 6px;
-  border: 2px solid var(--ru-accent, #0ea5e9);
-  display: inline-block;
-  position: relative;
-}
-
-.ru-task__check input:checked + span {
-  background: var(--ru-accent, #0ea5e9);
-}
-
-.ru-task__check input:checked + span::after {
-  content: '';
-  position: absolute;
-  top: 2px;
-  left: 6px;
-  width: 5px;
-  height: 10px;
-  border: solid white;
-  border-width: 0 2px 2px 0;
-  transform: rotate(45deg);
-}
-
 .ru-task__status-dot {
-  width: 20px;
-  height: 20px;
-  border-radius: 6px;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
   border: 2px solid #d1d5db;
   background: #f8fafc;
   flex-shrink: 0;
@@ -565,21 +560,12 @@ watch(
 
 .ru-task__title {
   font-weight: 700;
-  margin-bottom: 4px;
-}
-.ru-task__row {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  align-items: center;
+  margin-bottom: 2px;
 }
 .ru-task__points {
-  font-weight: 800;
-  color: #d69116;
-  white-space: nowrap;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+  font-weight: 700;
+  font-size: 13px;
+  color: #16a34a;
 }
 
 .ru-coin {

@@ -1,0 +1,475 @@
+{
+    "nav": {
+      "overview": "Prehľad",
+      "tasks": "Úlohy",
+      "rewards": "Odmeny",
+      "family": "Rodina",
+      "settings": "Nastavenia",
+      "logout": "Odhlásiť sa"
+    },
+
+    "days": {
+      "monday": "Pondelok",
+      "tuesday": "Utorok",
+      "wednesday": "Streda",
+      "thursday": "Štvrtok",
+      "friday": "Piatok",
+      "saturday": "Sobota",
+      "sunday": "Nedeľa",
+      "short": {
+        "monday": "PO",
+        "tuesday": "UT",
+        "wednesday": "ST",
+        "thursday": "ŠT",
+        "friday": "PI",
+        "saturday": "SO",
+        "sunday": "NE"
+      }
+    },
+
+    "error": {
+      "cancelTask": "Zrušená úloha",
+      "reallyDelete2": "Naozaj zmazať",
+      "conflict": "Konflikt pri manuálnom posune úlohy",
+      "rewardFail": "Chyba pri načítaní odmien"
+    },
+
+    "common": {
+      "save": "Uložiť",
+      "saveChanges": "Uložiť zmeny",
+      "cancel": "Zrušiť",
+      "close": "Zavrieť",
+      "delete": "Vymazať",
+      "edit": "Upraviť",
+      "add": "Pridať",
+      "copy": "Skopírované",
+      "copyCode": "Skopírovať kód",
+      "loading": "Načítavam...",
+      "uploading": "Nahrávam...",
+      "adding": "Pridávam...",
+      "menu": "Menu",
+      "off": "Vypnúť",
+      "active": "Aktívny",
+      "inactive": "Neaktívny",
+      "yes": "Áno",
+      "no": "Nie",
+      "continue": "Pokračovať",
+      "reward": "Odmena",
+      "remove": "Odstrániť",
+      "saved": "Uložené",
+      "sending": "Odosielam..."
+    },
+  
+    "fields": {
+      "email": "E-mail",
+      "name": "Meno",
+      "surname": "Priezvisko",
+      "avatar": "Avatar",
+      "password": "Heslo",
+      "passwordAgain": "Heslo znovu",
+      "passwordCurrent": "Aktuálne heslo",
+      "passwordNew": "Nové heslo",
+      "passwordRepeat": "Zadajte nové heslo znovu",
+      "rewardName": "Názov odmeny",
+      "rewardDescription": "Popis odmeny",
+      "pin": "PIN",
+      "kioskPin": "PIN pre vypnutie",
+      "inviteCode": "Pozývací kód",
+      "invitePin": "Pozývací kód (pre istotu):",
+      "loginPin": "Kód pre prihlásenie dieťaťa do aplikácie",
+      "selectDay": "Zvoľte deň",
+      "selectDay2": "Zvoľ si deň",
+      "selectRepeatDays": "Zvoľte dni na opakovanie",
+      "selectRewardCategory": "Vyberte kategóriu",
+      "colorScheme": "Farebná škála",
+      "codeDesc": "Zadajte 6‑miestny kód z rodičovskej aplikácie",
+      "inviteSend": "Poslať pozvánku"
+    },
+
+    "auth": {
+      "invalidEmail": "Zadajte platný email",
+      "login": {
+        "title": "Prihlásenie",
+        "parentTitle": "Prihlásenie rodiča",
+        "childTitle": "Prihlásenie dieťaťa",
+        "button": "Prihlásiť sa",
+        "logging": "Prihlasujem...",
+        "hasAccount": "Máte už vytvorený účet?",
+        "noAccount": "Ešte nemáte účet?",
+        "createNewAccount": "Založiť nový účet",
+        "back": "‹ Späť",
+        "backToLogin": "Späť na prihlásenie"
+      },
+      "register": {
+        "title": "Registrácia",
+        "desc": "Vytvorte si rodičovský účet. Overovací kód pošleme na email",
+        "button": "Registrovať sa",
+        "creating": "Registrujem...",
+        "createAccount": "Vytvoriť účet",
+        "yesAccount": "Už mám účet"
+      },
+      "google": {
+        "continue": "Pokračovať cez Google",
+        "connecting": "Pripájam Google",
+        "orContinue": "Alebo pokračujte cez Google"
+      },
+      "forgotPassword": {
+        "title": "Obnova hesla",
+        "link": "Zabudli ste heslo?",
+        "sendResetLink": "Odoslať odkaz"
+      },
+      "verify": {
+        "title": "Overenie emailu",
+        "desc": "Overovací kód sme poslali na:",
+        "code": "Overovací kód",
+        "button": "Overiť e-mail",
+        "verifying": "Overujem...",
+        "spamCheck": "Ak e-mail nevidíte, skontrolujte prosím aj spam",
+        "sendAgain": "Poslať kód znova"
+      },
+      "invite": {
+        "title": "Mám pozvánku",
+        "desc": "Zadajte pozývací kód z emailu a nastavte si heslo",
+        "code": "Pozývací kód",
+        "activate": "Aktivovať prístup",
+        "activating": "Aktivujem..."
+      },
+      "logout": {
+        "confirm": "Naozaj sa chcete odhlásiť?"
+      }
+    },
+
+    "overview": {
+      "title": "Prehľad",
+      "todayTasks": "Dnešné úlohy",
+      "todaysTotal": "Spolu možné získať za tento deň:",
+      "rewardsReceived": "Získané odmeny",
+      "clickToApply": "Kliknutím uplatníte",
+      "parentOnly": "Prístup len pre rodiča",
+      "rewardRedeemConfirm": "Naozaj chceš uplatniť odmenu?",
+      "emptyStates": {
+        "noTasksForChildren": {
+          "title": "Ide vám to skvele",
+          "desc": "Máte pridané dieťa, ale ešte nemáte vytvorené žiadne úlohy. Vytvorte úlohy a priraďte ich deťom.",
+          "button": "Pridať úlohy"
+        },
+        "noChildren": {
+          "title": "Začíname",
+          "desc": "Zatiaľ nemáte pridané žiadne deti. Najprv pridajte aspoň jedno dieťa, potom mu priraďte úlohy.",
+          "buttonAddChild": "Pridať dieťa",
+          "buttonTasks": "Prejsť na úlohy"
+        }
+      },
+      "tasks": {
+        "empty": "nemá na tento deň priradenú žiadnu úlohu"
+      }
+    },
+
+    "points": {
+      "label": "Body",
+      "point": "bod",
+      "points": "bodov",
+      "today": "Body za dnes",
+      "todayShort": "Dnes",
+      "last7Days": "Posledných 7 dní",
+      "total": "Body celkovo",
+      "week": "Týždeň",
+      "biweekly": "2 týždne",
+      "monthly": "Mesačne",
+      "correction": "Korigovanie bodov",
+      "edit": "Upraviť body",
+      "history": "História bodov",
+      "historyLast7Days": "História bodov (posledných 7 dní)",
+      "noHistory": "Žiadna história za posledných 7 dní",
+      "reason": "Dôvod",
+      "date": "Dátum",
+      "desc": "Popis",
+      "action": "Akcia",
+      "completed": "Splnené",
+      "remaining": "Zostáva"
+    },
+
+    "family": {
+      "title": "Rodina",
+      "children": "Deti",
+      "parents": "Rodičia / Starí rodičia",
+      "admin": "Správca",
+      "child": "Dieťa",
+      "prevChildren": "Predchádzajúce deti",
+      "nextChildren": "Ďalšie deti",
+      "page": "strana",
+      "pages": "strany",
+      "addNew": "Pridať dieťa alebo rodiča +",
+      "addChoice": {
+        "title": "Vyberte, čo chcete pridať",
+        "child": "Pridať dieťa",
+        "parent": "Pridať rodiča"
+      },
+      "childModal": {
+        "editTitle": "Upraviť dieťa",
+        "delete": "Zmazať dieťa"
+      },
+      "avatar": {
+        "change": "Zmeň fotku profilu",
+        "choose": "Vybrať fotku",
+        "remove": "Odstrániť"
+      },
+      "emptyStates": {
+        "noOtherMembers": {
+          "desc": "Zatiaľ tu nie sú ďalší dospelí členovia ani odoslané pozvánky."
+        },
+        "tasksNextStep": {
+          "title": "Pokračujte pridaním úloh alebo vyberte z knižnice",
+          "buttonAddTasks": "Pridať úlohy",
+          "buttonLibrary": "Pridať z knižnice"
+        }
+      },
+      "invites": {
+        "invite": "Pozvať",
+        "desc": "Zadajte email. Pozvanému príde email s pozývacím kódom (platí 7 dní).",
+        "active": "Aktívne pozvánky",
+        "sent": "Pozvánka odoslaná",
+        "sentValidUntil": "Pozvánka odoslaná · platí do",
+        "validUntil": "Platí do:",
+        "cancelConfirm": "Zrušiť túto pozvánku?",
+        "emailFailedCopyCode": "Email sa nepodarilo odoslať. Skopírujte kód a pošlite ho ručne.",
+        "sendFailed": "Pozvánku sa nepodarilo odoslať",
+        "cancelFailed": "Pozvánku sa nepodarilo zrušiť"
+      }
+    },
+
+    "tasks": {
+      "title": "Úlohy",
+      "required": "Povinné",
+      "optional": "Dobrovoľné",
+      "requiredTasks": "Povinné úlohy",
+      "optionalTasks": "Dobrovoľné úlohy",
+      "empty": "Zatiaľ nie sú pridané žiadne úlohy",
+      "emptyFilter": "Žiadne úlohy podľa filtra",
+      "emptyLibrary": "Knižnica úloh je zatiaľ prázdna",
+      "addNew": "Pridať novú úlohu +",
+      "add": "Pridať úlohu",
+      "edit": "Upraviť úlohu",
+      "assign": "Priradiť úlohu",
+      "noRequired": "Žiadne povinné úlohy",
+      "noOptional": "Žiadne dobrovoľné úlohy",
+      "noRequiredToday": "Žiadne povinné úlohy na dnes",
+      "noOptionalToday": "Žiadne dobrovoľné úlohy na dnes",
+      "library": "Knižnica úloh",
+      "filter": {
+        "abc": "Abecedne (A-Z)",
+        "pointsMore": "Najviac bodov",
+        "pointsLess": "Najmenej bodov"
+      },
+      "form": {
+        "title": "Názov úlohy",
+        "desc": "Popis úlohy",
+        "required": "Povinná úloha",
+        "optional": "Dobrovoľná úloha",
+        "lessPoints": "Menej bodov",
+        "morePoints": "Viac bodov"
+      },
+      "cat": {
+        "required": "Povinná",
+        "optional": "Dobrovoľná"
+      }
+    },
+
+    "rewards": {
+      "title": "Odmeny",
+      "reward": "Odmena",
+      "addNew": "Pridať novú odmenu +",
+      "add": "Pridať odmenu",
+      "edit": "Upraviť odmenu",
+      "buyForPoints": "Kúpiť za body",
+      "notEnoughPoints": "Zatiaľ máš málo bodov",
+      "redeem": "Uplatniť odmenu",
+      "library": "Knižnica odmien",
+      "empty": "Zatiaľ nie sú pridané žiadne odmeny",
+      "emptyLibrary": "Knižnica odmien je zatiaľ prázdna",
+      "form": {
+        "title": "Názov odmeny",
+        "desc": "Popis odmeny",
+        "cat": "Vyberte kategóriu"
+      },
+      "categories": {
+        "food": "Pochúťky",
+        "games": "Hranie",
+        "movies": "Filmy a rozprávky",
+        "joys": "Hračky",
+        "money": "Peniaze",
+        "trip": "Výlety a zážitky",
+        "sport": "Šport a pohyb",
+        "create": "Kreativita", 
+        "special": "Špeciálne privilégiá", 
+        "surprise": "Prekvapenia",
+        "other": "Iné" 
+      }
+    },
+
+    "settings": {
+      "title": "Nastavenia",
+      "profile": "Profil",
+      "taskRotationSettings": "Nastavenia úloh a rotácie",
+      "kiosk": {
+        "title": "Kiosk režim",
+        "desc": "Kiosk režim je pre tablet na stene: deti naraz, úlohy sa dajú odklikávať.",
+        "disablePin": "PIN pre vypnutie (klikni na X vpravo hore v kiosku)",
+        "turnOff": "Vypnúť Kiosk režim",
+        "turnOffPin": "Zadajte PIN pre ukončenie kiosk režimu",
+        "open": "Otvoriť kiosk",
+        "start": "Spustiť kiosk"
+      },
+      "rotation": {
+        "title": "Automatická rotácia úloh",
+        "move": "Presun rotácie",
+        "season": "Obdobie",
+        "monthlyAlways": "Mesačná rotácia beží vždy",
+        "firstDay": "1. deň v mesiaci o 00:01",
+        "startDay": "Začiatočný deň",
+        "setting": "Nastavenie úloh a rotácie"
+      },
+      "penalty": {
+        "title": "Penalizácia sobotných povinných úloh",
+        "multiplier": "Multiplikátor",
+        "state": "Stav:"
+      },
+      "password": {
+        "change": "Zmeniť heslo",
+        "changed": "Heslo bolo zmenené"
+      },
+      "reset": {
+        "title": "Reset dát",
+        "desc": "Pozor! Táto akcia je nevratná. Vymaže dáta iba pre váš účet.",
+        "children": "Resetovať deti",
+        "tasks": "Resetovať úlohy",
+        "rewards": "Resetovať odmeny"
+      },
+      "aboutApp": {
+        "title": "O aplikácii",
+        "version": "Verzia",
+        "build": "Build",
+        "environment": "Prostredie",
+        "contact": "Kontakt",
+        "email": "info@ekidio.com"
+      },
+      "language": {
+        "title": "Jazyk",
+        "desc": "Jazyk rozhrania aplikácie",
+        "sk": "Slovenčina",
+        "en": "English"
+      }
+    },
+
+    "kiosk": {
+      "fillPin": "Zadajte PIN",
+      "emptyPin": "PIN nie je nastavený",
+      "failPin": "Nesprávny PIN",
+      "failVerifyPin": "Nepodarilo sa overiť PIN",
+      "oneChildTask": "Úloha má len jedno dieťa",
+      "done": "Hotovo!",
+      "totalPoints": "Body spolu:",
+      "bought": "Zakúpené"
+    },
+
+    "success": {
+      "settingsSaved": "Nastavenia boli uložené",
+      "rotationMoved": "Rotácia bola posunutá",
+      "rotationSaved": "Nastavenie rotácie bolo uložené",
+      "multiplierSaved": "Multiplikátor bol uložený",
+      "passwordChanged": "Heslo bolo zmenené",
+      "passwordRecoverySent": "Ak je zadaný e-mail správny, poslali sme vám e-mail s inštrukciami",
+      "taskCompleted": "Splnená úloha:",
+      "taskCancelled": "Zrušená úloha",
+      "resetSuccess": "bol úspešný",
+      "codeSent": "Kód bol odoslaný"
+    },
+
+    "confirmations": {
+      "deleteRecord": "Naozaj zmazať záznam?",
+      "deleteItem": "Naozaj zmazať",
+      "deleteTask": "Naozaj zmazať túto úlohu?",
+      "deleteTaskWithName": "Naozaj zmazať úlohu",
+      "redeemReward": "Naozaj chceš uplatniť odmenu?",
+      "moveRotation": "Naozaj chcete posunúť rotáciu? Táto akcia vytvorí nový plán a rotačné úlohy sa posunú.",
+      "reset": "Naozaj chcete resetovať",
+      "irreversible": "Táto akcia je nevratná"
+    },
+
+    "errors": {
+      "generic": "Niečo sa pokazilo",
+      "loadData": "Chyba pri načítaní dát",
+      "save": "Chyba pri ukladaní",
+      "delete": "Chyba pri mazaní",
+      "uploadAvatar": "Chyba pri nahrávaní avatara",
+      "requiredFields": "Vyplňte všetky polia",
+      "nameSurnameEmailRequired": "Vyplňte meno, priezvisko a email",
+      "passwordMinLength": "Heslo musí mať aspoň 6 znakov",
+      "newPasswordMinLength": "Nové heslo musí mať aspoň 6 znakov",
+      "passwordsDoNotMatch": "Heslá sa nezhodujú",
+      "newPasswordsDoNotMatch": "Nové heslá sa nezhodujú",
+      "pinInvalid": "PIN musí mať 4 až 6 číslic",
+      "pinRequired": "Najprv nastavte PIN",
+      "emailRequired": "Najprv zadajte e-mail",
+      "resetFailed": "sa nepodaril",
+      "deleteFail": "Chyba pri mazaní záznamu",
+      "auth": {
+        "loginFailed": "Chyba pri prihlásení",
+        "registerFailed": "Chyba pri registrácii",
+        "verifyFailed": "Chyba pri overení",
+        "activationFailed": "Chyba pri aktivácii pozvánky",
+        "googleLoadFailed": "Google prihlásenie sa nepodarilo načítať",
+        "googleLoginFailed": "Chyba pri Google prihlásení",
+        "googleFinishFailed": "Google prihlásenie sa nepodarilo dokončiť",
+        "passwordRecoveryFailed": "Nepodarilo sa odoslať reset hesla",
+        "codeRequired": "Zadajte 6-miestny overovací kód",
+        "inviteCodeRequired": "Zadajte pozývací kód",
+        "codeSendFailed": "Kód sa nepodarilo odoslať"
+      },
+      "children": {
+        "missingId": "Chýba ID dieťaťa",
+        "loadFailed": "Chyba pri načítaní detí",
+        "loadRotationFailed": "Nepodarilo sa načítať deti pre posun",
+        "saveColorFailed": "Chyba pri ukladaní farby",
+        "saveAvatarFailed": "Chyba pri ukladaní avatara"
+      },
+      "tasks": {
+        "loadFailed": "Chyba pri načítaní úloh",
+        "libraryLoadFailed": "Nepodarilo sa načítať knižnicu úloh",
+        "importFailed": "Import sa nepodaril",
+        "selectLibraryTask": "Vyberte aspoň jednu úlohu z knižnice.",
+        "selectChild": "Vyberte aspoň jedno dieťa",
+        "selectRepeatDay": "Vyberte aspoň jeden deň opakovania",
+        "manualMoveConflict": "Konflikt pri manuálnom posune úlohy",
+        "moveFailed": "Presun úlohy sa nepodaril",
+        "stateChangeFailed": "Chyba pri zmene stavu"
+      },
+      "points": {
+        "loadFailed": "Chyba pri načítaní bodov",
+        "saveFailed": "Chyba pri ukladaní bodov"
+      },
+      "rewards": {
+        "applyFailed": "Odmenu sa nepodarilo uplatniť",
+        "loadFailed": "Chyba pri načítaní odmien",
+        "saveFailed": "Chyba pri ukladaní odmeny",
+        "deleteFailed": "Chyba pri mazaní odmeny",
+        "redeemFailed": "Chyba pri nákupe odmeny",
+        "libraryLoadFailed": "Nepodarilo sa načítať knižnicu odmien",
+        "selectReward": "Vyberte aspoň jednu odmenu z knižnice",
+        "applyFailedError": "Chyba pri uplatnení odmeny"
+      },
+      "settings": {
+        "saveFailed": "Chyba pri ukladaní nastavení",
+        "rotationMoveFailed": "Chyba pri posune rotácie",
+        "rotationSaveFailed": "Chyba pri uložení nastavenia rotácie",
+        "multiplierSaveFailed": "Chyba pri uložení multiplikátora",
+        "changePasswordFailed": "Heslo sa nepodarilo zmeniť",
+        "savePinFailed": "Nepodarilo sa uložiť PIN"
+      },
+      "family": {
+        "inviteEmailFailed": "Email sa nepodarilo odoslať. Skopírujte kód a pošlite ho ručne",
+        "inviteSendFailed": "Pozvánku sa nepodarilo odoslať",
+        "inviteCancelFailed": "Pozvánku sa nepodarilo zrušiť"
+      }
+  }
+}

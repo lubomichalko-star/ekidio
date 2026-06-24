@@ -1,13 +1,38 @@
 <!doctype html>
-<html lang="sk">
+<html lang="sk" translate="no" class="notranslate">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="google" content="notranslate" />
     <link rel="icon" type="image/png" href="/src/images/fav-green.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
     <title>ekidio</title>
   </head>
   <body>
     <div id="app"></div>
+    <style>
+      #app:empty {
+        display: flex;
+        min-height: 100dvh;
+        align-items: center;
+        justify-content: center;
+        background: #f3f4f6;
+      }
+      #app:empty::after {
+        content: '';
+        width: 42px;
+        height: 42px;
+        border-radius: 999px;
+        border: 4px solid rgba(148, 163, 184, 0.35);
+        border-top-color: #5abb6f;
+        animation: ru-boot-spin 0.9s linear infinite;
+      }
+      @keyframes ru-boot-spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
     <!-- Build timestamp: 2025-12-18-fix-login -->
     <script type="module" src="/src/main.js"></script>
   </body>

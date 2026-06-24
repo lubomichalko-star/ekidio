@@ -23,9 +23,13 @@ class Rodinne_Ulohy_Admin {
         add_action('admin_post_rodinne_ulohy_delete_feedback', array($this, 'handle_delete_feedback'));
         add_action('admin_post_rodinne_ulohy_save_task_library', array($this, 'handle_save_task_library'));
         add_action('admin_post_rodinne_ulohy_delete_task_library', array($this, 'handle_delete_task_library'));
+        add_action('admin_post_rodinne_ulohy_import_task_library_from_user', array($this, 'handle_import_task_library_from_user'));
         add_action('admin_post_rodinne_ulohy_save_reward_library', array($this, 'handle_save_reward_library'));
         add_action('admin_post_rodinne_ulohy_delete_reward_library', array($this, 'handle_delete_reward_library'));
+        add_action('admin_post_rodinne_ulohy_import_reward_library_from_user', array($this, 'handle_import_reward_library_from_user'));
         add_action('admin_post_rodinne_ulohy_save_settings', array($this, 'handle_save_settings'));
+        add_action('admin_post_rodinne_ulohy_export_owner', array($this, 'handle_export_owner'));
+        add_action('admin_post_rodinne_ulohy_import_owner', array($this, 'handle_import_owner'));
         add_action('admin_post_rodinne_ulohy_devtools_run', array($this, 'handle_devtools_run'));
     }
 
@@ -35,6 +39,7 @@ class Rodinne_Ulohy_Admin {
             strpos($hook_suffix, 'rodinne-ulohy-task-library') === false &&
             strpos($hook_suffix, 'rodinne-ulohy-reward-library') === false &&
             strpos($hook_suffix, 'rodinne-ulohy-settings') === false &&
+            strpos($hook_suffix, 'rodinne-ulohy-export-import') === false &&
             strpos($hook_suffix, 'rodinne-ulohy-devtools') === false
         ) {
             return;
@@ -76,6 +81,15 @@ class Rodinne_Ulohy_Admin {
             'manage_options',
             'rodinne-ulohy-reward-library',
             array($this, 'render_reward_library_page')
+        );
+
+        add_submenu_page(
+            'rodinne-ulohy-feedback',
+            __('Export / Import', 'rodinne-ulohy'),
+            __('Export / Import', 'rodinne-ulohy'),
+            'manage_options',
+            'rodinne-ulohy-export-import',
+            array($this, 'render_export_import_page')
         );
 
         add_submenu_page(
@@ -195,17 +209,55 @@ class Rodinne_Ulohy_Admin {
         return add_query_arg($args, admin_url('admin.php?page=rodinne-ulohy-settings'));
     }
 
-    private function get_notice_html($saved, $deleted, $error) {
+    private function get_notice_html($saved, $deleted, $error, $library_imported = 0) {
         if ($saved) {
             return '<div class="notice notice-success is-dismissible"><p>' . esc_html__('Záznam bol uložený.', 'rodinne-ulohy') . '</p></div>';
         }
         if ($deleted) {
             return '<div class="notice notice-success is-dismissible"><p>' . esc_html__('Záznam bol odstránený.', 'rodinne-ulohy') . '</p></div>';
         }
+        if ($library_imported > 0) {
+            return '<div class="notice notice-success is-dismissible"><p>' . esc_html(sprintf(
+                _n('Do knižnice bolo pridaných %d položka.', 'Do knižnice bolo pridaných %d položiek.', $library_imported, 'rodinne-ulohy'),
+                $library_imported
+            )) . '</p></div>';
+        }
         if (!empty($error)) {
             return '<div class="notice notice-error"><p>' . esc_html($error) . '</p></div>';
         }
         return '';
+    }
+
+    private function render_library_import_from_user_form($type) {
+        $is_tasks = ($type === 'tasks');
+        $action = $is_tasks ? 'rodinne_ulohy_import_task_library_from_user' : 'rodinne_ulohy_import_reward_library_from_user';
+        $nonce = $is_tasks ? 'rodinne_ulohy_import_task_library_from_user' : 'rodinne_ulohy_import_reward_library_from_user';
+        $field_id = $is_tasks ? 'library_import_task_user_id' : 'library_import_reward_user_id';
+        $field_name = $is_tasks ? 'import_task_user_id' : 'import_reward_user_id';
+        $label = $is_tasks
+            ? __('Import úloh od používateľa', 'rodinne-ulohy')
+            : __('Import odmien od používateľa', 'rodinne-ulohy');
+        $description = $is_tasks
+            ? __('Skopíruje všetky úlohy vybranej rodiny do globálnej knižnice. Existujúce položky knižnice zostanú zachované.', 'rodinne-ulohy')
+            : __('Skopíruje všetky odmeny vybranej rodiny do globálnej knižnice. Existujúce položky knižnice zostanú zachované.', 'rodinne-ulohy');
+        $button = $is_tasks
+            ? __('Importovať úlohy do knižnice', 'rodinne-ulohy')
+            : __('Importovať odmeny do knižnice', 'rodinne-ulohy');
+
+        echo '<div class="ru-admin-table-wrap" style="max-width:760px;margin:24px 0;">';
+        echo '<h2>' . esc_html($label) . '</h2>';
+        echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
+        echo '<input type="hidden" name="action" value="' . esc_attr($action) . '" />';
+        wp_nonce_field($nonce);
+        echo '<table class="form-table" role="presentation"><tbody>';
+        echo '<tr><th scope="row"><label for="' . esc_attr($field_id) . '">' . esc_html__('Používateľ', 'rodinne-ulohy') . '</label></th><td>';
+        $this->render_user_select($field_name, 0, $field_id);
+        echo '<p class="description">' . esc_html($description) . '</p>';
+        echo '</td></tr>';
+        echo '</tbody></table>';
+        submit_button($button, 'secondary', 'submit', false);
+        echo '</form>';
+        echo '</div>';
     }
 
     private function parse_days_from_request($key) {
@@ -259,6 +311,7 @@ class Rodinne_Ulohy_Admin {
         $saved = !empty($_GET['saved']);
         $deleted = !empty($_GET['deleted']);
         $error = isset($_GET['error']) ? sanitize_text_field(wp_unslash($_GET['error'])) : '';
+        $library_imported = isset($_GET['library_imported']) ? intval($_GET['library_imported']) : 0;
         $edit_id = isset($_GET['edit']) ? intval($_GET['edit']) : 0;
         $item = $edit_id ? Rodinne_Ulohy_Database::get_task_library_item($edit_id) : null;
         if (!$item) {
@@ -279,7 +332,7 @@ class Rodinne_Ulohy_Admin {
         echo '<div class="wrap">';
         echo '<h1>' . esc_html__('Knižnica úloh', 'rodinne-ulohy') . '</h1>';
         echo '<p>' . esc_html__('Tu nastavíš globálnu knižnicu úloh, z ktorej si rodičia v appke pridajú úlohy do svojej rodiny.', 'rodinne-ulohy') . '</p>';
-        echo $this->get_notice_html($saved, $deleted, $error);
+        echo $this->get_notice_html($saved, $deleted, $error, $library_imported);
 
         echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
         echo '<input type="hidden" name="action" value="rodinne_ulohy_save_task_library" />';
@@ -312,6 +365,8 @@ class Rodinne_Ulohy_Admin {
             echo '<a class="button button-secondary" href="' . esc_url($this->task_library_page_url()) . '">' . esc_html__('Zrušiť úpravu', 'rodinne-ulohy') . '</a>';
         }
         echo '</form>';
+
+        $this->render_library_import_from_user_form('tasks');
 
         echo '<hr />';
         echo '<h2>' . esc_html__('Položky v knižnici', 'rodinne-ulohy') . '</h2>';
@@ -396,6 +451,42 @@ class Rodinne_Ulohy_Admin {
         exit;
     }
 
+    public function handle_import_task_library_from_user() {
+        if (!current_user_can('manage_options')) {
+            wp_die(__('Nemáte oprávnenie', 'rodinne-ulohy'));
+        }
+        check_admin_referer('rodinne_ulohy_import_task_library_from_user');
+
+        $wp_user_id = isset($_POST['import_task_user_id']) ? intval($_POST['import_task_user_id']) : 0;
+        $user = $wp_user_id ? get_user_by('id', $wp_user_id) : null;
+        if (!$user) {
+            wp_safe_redirect($this->task_library_page_url(array(
+                'error' => __('Neplatný používateľ pre import.', 'rodinne-ulohy'),
+            )));
+            exit;
+        }
+
+        $owner_user_id = Rodinne_Ulohy_Database::resolve_owner_user_id_for_wp_user($wp_user_id);
+        $result = Rodinne_Ulohy_Database::import_tasks_to_library_from_owner($owner_user_id);
+        if (is_wp_error($result)) {
+            wp_safe_redirect($this->task_library_page_url(array(
+                'error' => $result->get_error_message(),
+            )));
+            exit;
+        }
+
+        $imported = intval($result['imported'] ?? 0);
+        if ($imported <= 0) {
+            wp_safe_redirect($this->task_library_page_url(array(
+                'error' => __('Používateľ nemá žiadne úlohy na import.', 'rodinne-ulohy'),
+            )));
+            exit;
+        }
+
+        wp_safe_redirect($this->task_library_page_url(array('library_imported' => $imported)));
+        exit;
+    }
+
     public function render_reward_library_page() {
         if (!current_user_can('manage_options')) {
             wp_die(__('Nemáte oprávnenie', 'rodinne-ulohy'));
@@ -404,6 +495,7 @@ class Rodinne_Ulohy_Admin {
         $saved = !empty($_GET['saved']);
         $deleted = !empty($_GET['deleted']);
         $error = isset($_GET['error']) ? sanitize_text_field(wp_unslash($_GET['error'])) : '';
+        $library_imported = isset($_GET['library_imported']) ? intval($_GET['library_imported']) : 0;
         $edit_id = isset($_GET['edit']) ? intval($_GET['edit']) : 0;
         $item = $edit_id ? Rodinne_Ulohy_Database::get_reward_library_item($edit_id) : null;
         if (!$item) {
@@ -414,7 +506,7 @@ class Rodinne_Ulohy_Admin {
         echo '<div class="wrap">';
         echo '<h1>' . esc_html__('Knižnica odmien', 'rodinne-ulohy') . '</h1>';
         echo '<p>' . esc_html__('Tu nastavíš globálnu knižnicu odmien, z ktorej si rodičia v appke pridajú odmeny do svojej rodiny.', 'rodinne-ulohy') . '</p>';
-        echo $this->get_notice_html($saved, $deleted, $error);
+        echo $this->get_notice_html($saved, $deleted, $error, $library_imported);
 
         echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
         echo '<input type="hidden" name="action" value="rodinne_ulohy_save_reward_library" />';
@@ -433,6 +525,8 @@ class Rodinne_Ulohy_Admin {
             echo '<a class="button button-secondary" href="' . esc_url($this->reward_library_page_url()) . '">' . esc_html__('Zrušiť úpravu', 'rodinne-ulohy') . '</a>';
         }
         echo '</form>';
+
+        $this->render_library_import_from_user_form('rewards');
 
         echo '<hr />';
         echo '<h2>' . esc_html__('Položky v knižnici', 'rodinne-ulohy') . '</h2>';
@@ -510,6 +604,42 @@ class Rodinne_Ulohy_Admin {
             Rodinne_Ulohy_Database::delete_reward_library_item($id);
         }
         wp_safe_redirect($this->reward_library_page_url(array('deleted' => 1)));
+        exit;
+    }
+
+    public function handle_import_reward_library_from_user() {
+        if (!current_user_can('manage_options')) {
+            wp_die(__('Nemáte oprávnenie', 'rodinne-ulohy'));
+        }
+        check_admin_referer('rodinne_ulohy_import_reward_library_from_user');
+
+        $wp_user_id = isset($_POST['import_reward_user_id']) ? intval($_POST['import_reward_user_id']) : 0;
+        $user = $wp_user_id ? get_user_by('id', $wp_user_id) : null;
+        if (!$user) {
+            wp_safe_redirect($this->reward_library_page_url(array(
+                'error' => __('Neplatný používateľ pre import.', 'rodinne-ulohy'),
+            )));
+            exit;
+        }
+
+        $owner_user_id = Rodinne_Ulohy_Database::resolve_owner_user_id_for_wp_user($wp_user_id);
+        $result = Rodinne_Ulohy_Database::import_rewards_to_library_from_owner($owner_user_id);
+        if (is_wp_error($result)) {
+            wp_safe_redirect($this->reward_library_page_url(array(
+                'error' => $result->get_error_message(),
+            )));
+            exit;
+        }
+
+        $imported = intval($result['imported'] ?? 0);
+        if ($imported <= 0) {
+            wp_safe_redirect($this->reward_library_page_url(array(
+                'error' => __('Používateľ nemá žiadne odmeny na import.', 'rodinne-ulohy'),
+            )));
+            exit;
+        }
+
+        wp_safe_redirect($this->reward_library_page_url(array('library_imported' => $imported)));
         exit;
     }
 
@@ -707,6 +837,236 @@ class Rodinne_Ulohy_Admin {
 
         $redirect = admin_url('admin.php?page=rodinne-ulohy-devtools&ru_msg=' . rawurlencode($msg) . '&ru_token=' . rawurlencode($token));
         wp_safe_redirect($redirect);
+        exit;
+    }
+
+    private function export_import_page_url($args = array()) {
+        return add_query_arg($args, admin_url('admin.php?page=rodinne-ulohy-export-import'));
+    }
+
+    private function get_export_import_user_options() {
+        $users = get_users(array(
+            'orderby' => 'display_name',
+            'order' => 'ASC',
+            'fields' => array('ID', 'display_name', 'user_email', 'user_login'),
+        ));
+
+        $options = array();
+        foreach ($users as $user) {
+            $wp_user_id = intval($user->ID);
+            if ($wp_user_id <= 0) {
+                continue;
+            }
+            $owner_user_id = Rodinne_Ulohy_Database::resolve_owner_user_id_for_wp_user($wp_user_id);
+            $summary = Rodinne_Ulohy_Database::get_owner_data_summary($owner_user_id);
+            $label = trim($user->display_name . ' (' . $user->user_email . ')');
+            if ($owner_user_id !== $wp_user_id) {
+                $label .= ' — ' . sprintf(__('rodina #%d', 'rodinne-ulohy'), $owner_user_id);
+            }
+            $label .= ' — ' . sprintf(
+                __('%d detí, %d úloh, %d odmien', 'rodinne-ulohy'),
+                intval($summary['children'] ?? 0),
+                intval($summary['tasks'] ?? 0),
+                intval($summary['rewards'] ?? 0)
+            );
+            $options[] = array(
+                'id' => $wp_user_id,
+                'label' => $label,
+            );
+        }
+
+        return $options;
+    }
+
+    private function render_user_select($name, $selected = 0, $id = '') {
+        if ($id === '') {
+            $id = $name;
+        }
+        $options = $this->get_export_import_user_options();
+        echo '<select name="' . esc_attr($name) . '" id="' . esc_attr($id) . '" class="regular-text" required>';
+        echo '<option value="">' . esc_html__('— vyberte používateľa —', 'rodinne-ulohy') . '</option>';
+        foreach ($options as $option) {
+            echo '<option value="' . esc_attr(intval($option['id'])) . '" ' . selected(intval($selected), intval($option['id']), false) . '>';
+            echo esc_html($option['label']);
+            echo '</option>';
+        }
+        echo '</select>';
+    }
+
+    public function render_export_import_page() {
+        if (!current_user_can('manage_options')) {
+            wp_die(__('Nemáte oprávnenie', 'rodinne-ulohy'));
+        }
+
+        $imported = !empty($_GET['imported']);
+        $import_error = isset($_GET['import_error']) ? sanitize_text_field(wp_unslash($_GET['import_error'])) : '';
+        $import_summary = isset($_GET['import_summary']) ? sanitize_text_field(wp_unslash($_GET['import_summary'])) : '';
+
+        echo '<div class="wrap">';
+        echo '<h1>' . esc_html__('Export / Import rodinných dát', 'rodinne-ulohy') . '</h1>';
+        echo '<p>' . esc_html__('Exportujte alebo importujte deti, úlohy, odmeny, body a ďalšie dáta viazané na vybraného používateľa. Import nahradí existujúce dáta cieľového používateľa.', 'rodinne-ulohy') . '</p>';
+
+        if ($imported) {
+            echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__('Import bol úspešný.', 'rodinne-ulohy');
+            if ($import_summary !== '') {
+                echo ' ' . esc_html($import_summary);
+            }
+            echo '</p></div>';
+        }
+        if ($import_error !== '') {
+            echo '<div class="notice notice-error is-dismissible"><p>' . esc_html($import_error) . '</p></div>';
+        }
+
+        echo '<div class="ru-admin-table-wrap" style="max-width:760px;margin-top:24px;">';
+
+        echo '<h2>' . esc_html__('Export', 'rodinne-ulohy') . '</h2>';
+        echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
+        echo '<input type="hidden" name="action" value="rodinne_ulohy_export_owner" />';
+        wp_nonce_field('rodinne_ulohy_export_owner');
+        echo '<table class="form-table" role="presentation"><tbody>';
+        echo '<tr><th scope="row"><label for="export_user_id">' . esc_html__('Používateľ', 'rodinne-ulohy') . '</label></th><td>';
+        $this->render_user_select('export_user_id');
+        echo '<p class="description">' . esc_html__('Stiahne JSON súbor so všetkými dátami rodiny tohto používateľa.', 'rodinne-ulohy') . '</p>';
+        echo '</td></tr>';
+        echo '</tbody></table>';
+        submit_button(__('Stiahnuť export', 'rodinne-ulohy'), 'secondary', 'submit', false);
+        echo '</form>';
+
+        echo '<hr style="margin:32px 0;" />';
+
+        echo '<h2>' . esc_html__('Import', 'rodinne-ulohy') . '</h2>';
+        echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" enctype="multipart/form-data" onsubmit="return confirm(\'' . esc_js(__('Import prepíše aktuálne dáta vybraného používateľa. Pokračovať?', 'rodinne-ulohy')) . '\');">';
+        echo '<input type="hidden" name="action" value="rodinne_ulohy_import_owner" />';
+        wp_nonce_field('rodinne_ulohy_import_owner');
+        echo '<table class="form-table" role="presentation"><tbody>';
+        echo '<tr><th scope="row"><label for="import_user_id">' . esc_html__('Cieľový používateľ', 'rodinne-ulohy') . '</label></th><td>';
+        $this->render_user_select('import_user_id');
+        echo '<p class="description">' . esc_html__('Dáta sa importujú do rodiny tohto používateľa a prepíšu existujúci obsah.', 'rodinne-ulohy') . '</p>';
+        echo '</td></tr>';
+        echo '<tr><th scope="row"><label for="import_file">' . esc_html__('Súbor exportu', 'rodinne-ulohy') . '</label></th><td>';
+        echo '<input type="file" name="import_file" id="import_file" accept=".json,application/json" required />';
+        echo '<p class="description">' . esc_html__('JSON súbor stiahnutý z tejto stránky exportu.', 'rodinne-ulohy') . '</p>';
+        echo '</td></tr>';
+        echo '<tr><th scope="row">' . esc_html__('Potvrdenie', 'rodinne-ulohy') . '</th><td>';
+        echo '<label><input type="checkbox" name="import_confirm" value="1" required /> ';
+        echo esc_html__('Chcem prepísať existujúce dáta importovaným obsahom.', 'rodinne-ulohy');
+        echo '</label></td></tr>';
+        echo '</tbody></table>';
+        submit_button(__('Importovať', 'rodinne-ulohy'), 'primary', 'submit', false);
+        echo '</form>';
+
+        echo '</div>';
+        echo '</div>';
+    }
+
+    public function handle_export_owner() {
+        if (!current_user_can('manage_options')) {
+            wp_die(__('Nemáte oprávnenie', 'rodinne-ulohy'));
+        }
+        check_admin_referer('rodinne_ulohy_export_owner');
+
+        $wp_user_id = isset($_POST['export_user_id']) ? intval($_POST['export_user_id']) : 0;
+        $user = $wp_user_id ? get_user_by('id', $wp_user_id) : null;
+        if (!$user) {
+            wp_safe_redirect($this->export_import_page_url(array(
+                'import_error' => __('Neplatný používateľ pre export.', 'rodinne-ulohy'),
+            )));
+            exit;
+        }
+
+        $owner_user_id = Rodinne_Ulohy_Database::resolve_owner_user_id_for_wp_user($wp_user_id);
+        $payload = Rodinne_Ulohy_Database::export_owner_data($owner_user_id, $wp_user_id);
+        if (is_wp_error($payload)) {
+            wp_safe_redirect($this->export_import_page_url(array(
+                'import_error' => $payload->get_error_message(),
+            )));
+            exit;
+        }
+
+        $json = wp_json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        if ($json === false) {
+            wp_safe_redirect($this->export_import_page_url(array(
+                'import_error' => __('Export sa nepodarilo zakódovať do JSON.', 'rodinne-ulohy'),
+            )));
+            exit;
+        }
+
+        $filename = 'ekidio-export-user-' . $wp_user_id . '-' . gmdate('Y-m-d-His') . '.json';
+        nocache_headers();
+        header('Content-Type: application/json; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Content-Length: ' . strlen($json));
+        echo $json;
+        exit;
+    }
+
+    public function handle_import_owner() {
+        if (!current_user_can('manage_options')) {
+            wp_die(__('Nemáte oprávnenie', 'rodinne-ulohy'));
+        }
+        check_admin_referer('rodinne_ulohy_import_owner');
+
+        if (empty($_POST['import_confirm'])) {
+            wp_safe_redirect($this->export_import_page_url(array(
+                'import_error' => __('Musíte potvrdiť prepísanie existujúcich dát.', 'rodinne-ulohy'),
+            )));
+            exit;
+        }
+
+        $wp_user_id = isset($_POST['import_user_id']) ? intval($_POST['import_user_id']) : 0;
+        $user = $wp_user_id ? get_user_by('id', $wp_user_id) : null;
+        if (!$user) {
+            wp_safe_redirect($this->export_import_page_url(array(
+                'import_error' => __('Neplatný cieľový používateľ.', 'rodinne-ulohy'),
+            )));
+            exit;
+        }
+
+        if (empty($_FILES['import_file']) || !empty($_FILES['import_file']['error'])) {
+            wp_safe_redirect($this->export_import_page_url(array(
+                'import_error' => __('Nebol vybraný platný súbor exportu.', 'rodinne-ulohy'),
+            )));
+            exit;
+        }
+
+        $tmp_name = $_FILES['import_file']['tmp_name'];
+        $raw = file_get_contents($tmp_name);
+        if ($raw === false || $raw === '') {
+            wp_safe_redirect($this->export_import_page_url(array(
+                'import_error' => __('Súbor exportu je prázdny.', 'rodinne-ulohy'),
+            )));
+            exit;
+        }
+
+        $payload = json_decode($raw, true);
+        if (!is_array($payload)) {
+            wp_safe_redirect($this->export_import_page_url(array(
+                'import_error' => __('Súbor exportu nie je platný JSON.', 'rodinne-ulohy'),
+            )));
+            exit;
+        }
+
+        $owner_user_id = Rodinne_Ulohy_Database::resolve_owner_user_id_for_wp_user($wp_user_id);
+        $result = Rodinne_Ulohy_Database::import_owner_data($owner_user_id, $payload, $wp_user_id);
+        if (is_wp_error($result)) {
+            wp_safe_redirect($this->export_import_page_url(array(
+                'import_error' => $result->get_error_message(),
+            )));
+            exit;
+        }
+
+        $summary = $result['summary'] ?? array();
+        $summary_text = sprintf(
+            __('%d detí, %d úloh, %d odmien', 'rodinne-ulohy'),
+            intval($summary['children'] ?? 0),
+            intval($summary['tasks'] ?? 0),
+            intval($summary['rewards'] ?? 0)
+        );
+
+        wp_safe_redirect($this->export_import_page_url(array(
+            'imported' => 1,
+            'import_summary' => $summary_text,
+        )));
         exit;
     }
 }

@@ -97,6 +97,10 @@ const routes = [
     meta: { requiresParent: true }
   },
   {
+    path: '/dnes',
+    redirect: { name: 'home' }
+  },
+  {
     path: '/settings',
     name: 'settings',
     component: () => import('./views/SettingsView.vue'),
@@ -110,14 +114,36 @@ const router = createRouter({
   routes
 });
 
+let isStartupNavigation = true;
+
+async function validateSession({ force = false } = {}) {
+  const token = await getToken();
+  if (!token) {
+    clearStoredAuth();
+    return { ok: false };
+  }
+
+  try {
+    const res = await ensureAuthFromMe({ force });
+    if (res?.loggedIn) return { ok: true };
+    await clearToken();
+    clearStoredAuth();
+    return { ok: false };
+  } catch (e) {
+    await clearToken();
+    clearStoredAuth();
+    return { ok: false };
+  }
+}
+
 router.beforeEach((to, from, next) => {
   (async () => {
-    // Always allow login route
+    const forceAuth = isStartupNavigation;
+    isStartupNavigation = false;
+
     if (to.name === 'login' || (to.meta && to.meta.public)) {
-      const token = await getToken();
-      if (token) {
-        // already logged in -> go home
-        // kiosk mode: force kiosk route even after login
+      const session = await validateSession({ force: forceAuth });
+      if (session.ok) {
         const cfg = getConfig();
         next(cfg.kiosk ? { name: 'kiosk' } : { name: 'home' });
         return;
@@ -126,19 +152,8 @@ router.beforeEach((to, from, next) => {
       return;
     }
 
-    const token = await getToken();
-    if (!token) {
-      next({ name: 'login' });
-      return;
-    }
-
-    try {
-      // Resolve role from /auth/me (cached for a short time to prevent slowing down every navigation)
-      await ensureAuthFromMe({ force: false });
-    } catch (e) {
-      // token invalid -> clear and go login
-      await clearToken();
-      clearStoredAuth();
+    const session = await validateSession({ force: forceAuth });
+    if (!session.ok) {
       next({ name: 'login' });
       return;
     }

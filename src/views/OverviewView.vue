@@ -1,15 +1,42 @@
 <template>
   <section class="ru-card ru-overview-card">
     <header class="ru-card__header avatars-header" :class="{ 'mobile-open': mobilePickerOpen }">
-      <div class="ru-overview-mobile-top" v-if="selectedChildForHeader">
+      <div class="ru-overview-avatars" v-if="!isMobile && validChildren.length">
+        <button
+          v-for="child in validChildren"
+          :key="`overview-child-${child.id}`"
+          type="button"
+          class="ru-avatar-btn"
+          :class="{ active: String(child.id) === selectedChildId }"
+          @click="selectChild(child.id)"
+        >
+          <ChildAvatarBadge
+            :child="child"
+            :points="childPointsBalance(child.id)"
+            :active="String(child.id) === selectedChildId"
+          />
+          <span class="ru-avatar-name">{{ child?.name || 'Dieťa' }}</span>
+        </button>
+      </div>
+
+      <div class="ru-overview-mobile-top" v-if="isMobile && selectedChildForHeader">
         <div class="ru-mobile-picker-wrap">
           <button class="ru-mobile-child-btn" type="button" @click="toggleMobilePicker">
-            <span class="ru-avatar circle" :style="{ background: selectedChildForHeader?.color || '#0ea5e9' }">
-              <span v-if="!selectedChildForHeader?.avatar_url">{{ String(selectedChildForHeader?.name || '?').charAt(0) }}</span>
-              <img v-else :src="selectedChildForHeader?.avatar_url || ''" :alt="selectedChildForHeader?.name || 'Dieťa'" />
+            <span
+              class="ru-mobile-child-avatar-hit"
+              role="button"
+              tabindex="0"
+              aria-label="Body"
+              @click.stop="openPointsModal"
+              @keydown.enter.stop.prevent="openPointsModal"
+            >
+              <ChildAvatarBadge
+                :child="selectedChildForHeader"
+                :points="childPointsBalance(selectedChildId)"
+              />
             </span>
             <span class="ru-mobile-child-name">{{ selectedChildForHeader?.name || 'Dieťa' }}</span>
-            <span class="ru-mobile-child-caret">▾</span>
+            <span class="ru-mobile-child-caret" v-if="overviewDropdownChildren.length > 1">▾</span>
           </button>
           <div class="ru-mobile-child-menu" v-if="mobilePickerOpen">
             <button
@@ -21,9 +48,23 @@
               @click="pickMobileChild(child.id)"
             >
               <span>{{ child?.name || 'Dieťa' }}</span>
-              <span class="ru-avatar circle" :style="{ background: child?.color || '#0ea5e9' }">
+              <span
+                class="ru-avatar circle ru-mobile-child-option__avatar"
+                :class="{ active: String(child.id) === selectedChildId }"
+                :style="{
+                  background: child?.color || '#0ea5e9',
+                  borderColor: child?.color || '#0ea5e9',
+                  '--child-accent': child?.color || '#0ea5e9',
+                }"
+              >
                 <span v-if="!child?.avatar_url">{{ String(child?.name || '?').charAt(0) }}</span>
-                <img v-else :src="child?.avatar_url || ''" :alt="child?.name || 'Dieťa'" loading="eager" decoding="async" fetchpriority="high" />
+                <img
+                  v-else
+                  :src="child.avatar_url"
+                  :alt="child?.name || 'Dieťa'"
+                  loading="eager"
+                  decoding="async"
+                />
               </span>
             </button>
           </div>
@@ -40,11 +81,6 @@
             decoding="async"
           />
         </div>
-
-        <button class="ru-mobile-points-inline" v-if="isMobileParentSingleMode" type="button" @click="openPointsModal" aria-label="Body">
-          <span class="ru-mobile-points-inline__value">{{ (pointsData.points_balance ?? childData?.points_balance ?? '–') }}</span>
-          <img :src="coinIcon" alt="" class="ru-mobile-points-inline__coin" />
-        </button>
       </div>
 
     </header>
@@ -53,7 +89,10 @@
       <p class="ru-error">Prístup len pre rodiča.</p>
     </div>
 
-    <div class="ru-card__body" v-else-if="childrenLoading">Načítavam…</div>
+    <div class="ru-card__body" v-else-if="!appReady || childrenLoading">Načítavam…</div>
+    <div class="ru-card__body" v-else-if="error && !children.length">
+      <p class="ru-error">{{ error }}</p>
+    </div>
     <div class="ru-card__body" v-else-if="!children.length">
       <div class="ru-empty-state">
         <h3>Začnime</h3>
@@ -71,24 +110,18 @@
       </div>
     </div>
 
-    <div class="ru-card__body" v-else-if="loading">Načítavam…</div>
+    <div class="ru-card__body" v-else-if="loading && !childData">Načítavam…</div>
     <div class="ru-card__body" v-else-if="error">
       <p class="ru-error">{{ error }}</p>
     </div>
 
     <div class="ru-card__body" v-else-if="childData">
-      <div class="ru-overview-stats" v-if="!isMobileParentSingleMode">
-        <button class="ru-stat-btn" type="button" @click="openPointsModal">
-          <div class="ru-stat-btn__label">TOTAL</div>
-          <div class="ru-stat-btn__value">{{ (pointsData.points_balance ?? childData.points_balance ?? '–') }}</div>
-        </button>
-        <button class="ru-stat-btn" type="button" @click="openPointsModal">
-          <div class="ru-stat-btn__label">LAST 7 DAYS</div>
-          <div class="ru-stat-btn__value">{{ last7DaysEarnedDisplay }}</div>
-        </button>
-        <button class="ru-stat-btn featured" type="button" @click="openPointsModal">
-          <div class="ru-stat-btn__label">TODAY</div>
-          <div class="ru-stat-btn__value">{{ todayEarnedDisplay }}</div>
+      <div class="ru-overview-points" v-if="!isMobileParentSingleMode">
+        <button type="button" class="ru-overview-points-btn" @click="openPointsModal" aria-label="Body">
+          <PointsBadgeChip
+            :points="pointsData.points_balance ?? childData.points_balance ?? 0"
+            size="lg"
+          />
         </button>
       </div>
 
@@ -127,16 +160,11 @@
         </div>
       </div>
 
-      <div class="ru-days-bar">
-        <button
-          v-for="d in days"
-          :key="d.value"
-          :class="['ru-day-pill', { active: selectedDay === d.value }]"
-          @click="changeDay(d.value)"
-        >
-          {{ d.label }}
-        </button>
-      </div>
+      <WeekDayBar
+        v-if="selectedChildId"
+        v-model:selected-day="selectedDay"
+        v-model:week-start="selectedWeekStart"
+      />
 
       <div class="ru-task-groups">
         <div class="ru-section" v-for="group in taskGroups" :key="group.key">
@@ -145,6 +173,50 @@
           </div>
           <div v-if="group.tasks.items.length" class="ru-task-list">
             <div v-for="item in group.tasks.items" :key="item.id" class="ru-task-row">
+              <div class="ru-task__icon-wrap">
+                <img
+                  v-if="taskIconUrl(item)"
+                  :src="taskIconUrl(item)"
+                  alt=""
+                  class="ru-task__icon"
+                />
+              </div>
+              <div class="ru-task-body">
+                <div class="ru-task-title-wrap">
+                  <div class="ru-task-title">{{ item.task_name || item.name }}</div>
+                  <div class="ru-inline-rotate-wrap" v-if="isRotatingTask(item)">
+                    <button
+                      type="button"
+                      class="ru-inline-rotate-btn"
+                      title="Presunúť rotačnú úlohu na iné dieťa"
+                      @click.stop="openShiftMenu(item)"
+                    >
+                      →
+                    </button>
+                    <div
+                      v-if="shiftOpenTaskId === Number(item.task_id || 0)"
+                      class="ru-inline-rotate-menu"
+                      @click.stop
+                    >
+                      <div class="ru-inline-rotate-hint">Presunúť úlohu na</div>
+                      <button
+                        v-for="target in shiftChildrenOptions(item)"
+                        :key="`overview-shift-${item.id}-${target.id}`"
+                        type="button"
+                        class="ru-inline-rotate-option"
+                        :disabled="shiftLoadingTaskId === Number(item.task_id || 0)"
+                        @click.stop="shiftTaskToChild(item, target.id)"
+                      >
+                        {{ target.name }}
+                      </button>
+                      <div class="ru-inline-rotate-empty" v-if="!shiftChildrenOptions(item).length">
+                        Úloha má len jedno dieťa
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="ru-task-points-sub">{{ taskPointsEarnLabel(item) }}</div>
+              </div>
               <label v-if="isToday" class="ru-task-check">
                 <input
                   type="checkbox"
@@ -155,43 +227,6 @@
                 <span></span>
               </label>
               <span v-else class="ru-status-dot" :class="{ done: isTaskDone(item) }"></span>
-              <div class="ru-task-title-wrap">
-                <div class="ru-task-title">{{ item.task_name || item.name }}</div>
-                <div class="ru-inline-rotate-wrap" v-if="isRotatingTask(item)">
-                  <button
-                    type="button"
-                    class="ru-inline-rotate-btn"
-                    title="Presunúť rotačnú úlohu na iné dieťa"
-                    @click.stop="openShiftMenu(item)"
-                  >
-                    →
-                  </button>
-                  <div
-                    v-if="shiftOpenTaskId === Number(item.task_id || 0)"
-                    class="ru-inline-rotate-menu"
-                    @click.stop
-                  >
-                    <div class="ru-inline-rotate-hint">Presunúť úlohu na</div>
-                    <button
-                      v-for="target in shiftChildrenOptions(item)"
-                      :key="`overview-shift-${item.id}-${target.id}`"
-                      type="button"
-                      class="ru-inline-rotate-option"
-                      :disabled="shiftLoadingTaskId === Number(item.task_id || 0)"
-                      @click.stop="shiftTaskToChild(item, target.id)"
-                    >
-                      {{ target.name }}
-                    </button>
-                    <div class="ru-inline-rotate-empty" v-if="!shiftChildrenOptions(item).length">
-                      Úloha má len jedno dieťa
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="ru-task-points">
-                {{ pointLabel(item, group.key === 'povinne') }}
-                <img :src="coinIcon" alt="coin" class="ru-coin" />
-              </div>
             </div>
           </div>
           <p class="ru-empty" v-else>{{ childName || 'Dieťa' }} nemá na tento deň priradenú žiadnu úlohu</p>
@@ -278,32 +313,43 @@ import { api } from '../api/client';
 import { pointsApi } from '../api/points';
 import { childrenApi } from '../api/children';
 import { tasksApi } from '../api/tasks';
-import coinPng from '../images/star.png';
+import { getTaskIconUrl } from '../lib/taskIcons';
+import { taskPointsEarnLabel } from '../utils/points';
+import ChildAvatarBadge from '../components/ChildAvatarBadge.vue';
+import PointsBadgeChip from '../components/PointsBadgeChip.vue';
 import RuModal from '../components/RuModal.vue';
+import WeekDayBar from '../components/WeekDayBar.vue';
 import {
   getCachedChildren,
+  getCachedOverview,
   getCachedPointsOverview,
   getCachedPointsOverviewAgeMs,
   getCachedTasks,
+  invalidateCachedOverview,
   invalidateCachedPointsOverview,
+  prefetchChildOverviewWeek,
   setCachedOverview,
   setCachedChildren,
   setCachedPointsOverview,
   setCachedTasks
 } from '../state/preloadCache';
-import { invalidateCachedOverview } from '../state/preloadCache';
-import { DAYS_SHORT_SK, DAY_ORDER, isDayPastOrToday } from '../utils/days';
-import { pointLabel as pointLabelUtil } from '../utils/points';
+import {
+  getWeekStartForDate,
+  isYmdPastOrToday,
+  toYmd,
+  ymdForWeekDay,
+} from '../utils/days';
 import { useChildOverview } from '../composables/useChildOverview';
 import { emitRuDataChanged, onRuAuthChanged, onRuDataChanged, onRuForceOverviewRefresh } from '../events/ruEvents';
 
 const props = defineProps({
   role: { type: String, default: 'parent' },
   childId: { type: [String, Number], default: '' },
-  localized: { type: Object, default: () => ({}) }
+  localized: { type: Object, default: () => ({}) },
+  appReady: { type: Boolean, default: false },
 });
 
-const coinIcon = coinPng;
+const taskIconUrl = (item) => getTaskIconUrl(item?.task_icon || item?.icon || '');
 
 const isParent = computed(() => {
   if (props.role === 'parent') return true;
@@ -323,26 +369,29 @@ const goToTasks = (openAdd = false) => {
   } catch {}
 };
 
-const childrenList = ref([]);
+const cachedInitial = getCachedChildren();
+const childrenList = ref(Array.isArray(cachedInitial) ? cachedInitial : []);
 const children = computed(() => childrenList.value || []);
-const childrenLoading = ref(false);
+const childrenLoading = ref(!(Array.isArray(cachedInitial) && cachedInitial.length > 0));
 
 let childrenReqId = 0;
 const loadChildren = async () => {
   const reqId = ++childrenReqId;
   if (!isParent.value) {
     childrenList.value = [];
+    childrenLoading.value = false;
     return;
   }
-  // Use preload cache if available (avoids first-load flash)
+
   const cached = getCachedChildren();
-  if (Array.isArray(cached) && cached.length) {
+  if (Array.isArray(cached)) {
     if (reqId === childrenReqId) {
       childrenList.value = cached;
       childrenLoading.value = false;
     }
-    return;
+    if (cached.length) return;
   }
+
   if (reqId === childrenReqId) childrenLoading.value = true;
   try {
     const list = await childrenApi.list();
@@ -350,12 +399,23 @@ const loadChildren = async () => {
     childrenList.value = Array.isArray(list) ? list : [];
     setCachedChildren(childrenList.value);
   } catch (e) {
-    // If children list fails to load, keep UI stable and show error in body.
     if (reqId !== childrenReqId) return;
     childrenList.value = [];
     error.value = e?.message || 'Chyba pri načítaní detí';
   } finally {
     if (reqId === childrenReqId) childrenLoading.value = false;
+  }
+};
+
+const bootstrapOverview = async () => {
+  if (!isParent.value || !props.appReady) return;
+  if (!hasExplicitChild.value) {
+    applyParentOverviewPreference();
+  }
+  await loadChildren();
+  loadTasksCount();
+  if (!selectedChildId.value && children.value.length) {
+    selectedChildId.value = normalizeId(children.value[0].id);
   }
 };
 const normalizeId = (val) => {
@@ -411,6 +471,24 @@ const selectedChildForHeader = computed(() => {
 });
 const overviewDropdownChildren = computed(() => validChildren.value);
 
+const childPointsBalance = (childId) => {
+  const cid = String(childId || '');
+  if (!cid) return 0;
+  if (cid === String(selectedChildId.value)) {
+    const live = Number(pointsData.value?.points_balance ?? childData.value?.points_balance);
+    if (Number.isFinite(live)) return live;
+  }
+  const cachedPoints = getCachedPointsOverview(cid);
+  if (cachedPoints && typeof cachedPoints.points_balance === 'number') {
+    return cachedPoints.points_balance;
+  }
+  const cachedOverview = getCachedOverview(cid, selectedDay.value, selectedWeekStart.value);
+  if (cachedOverview && typeof cachedOverview.points_balance === 'number') {
+    return cachedOverview.points_balance;
+  }
+  return 0;
+};
+
 watch(
   () => props.childId,
   (val) => {
@@ -456,6 +534,7 @@ watch(
 const selectChild = (id) => {
   const normalized = normalizeId(id);
   if (normalized && normalized !== selectedChildId.value) {
+    selectedWeekStart.value = getWeekStartForDate();
     selectedDay.value = todayDay.value;
     selectedChildId.value = normalized;
   }
@@ -479,13 +558,10 @@ const applyParentOverviewPreference = () => {
 };
 
 const todayDay = ref(new Date().getDay());
+const selectedWeekStart = ref(getWeekStartForDate());
 const selectedDay = ref(todayDay.value);
-const isToday = computed(() => Number(selectedDay.value) === Number(todayDay.value));
-const days = DAYS_SHORT_SK;
-const changeDay = (value) => {
-  selectedDay.value = value;
-};
-const isDayPastOrTodayLocal = (day) => isDayPastOrToday(day, todayDay.value);
+const isToday = computed(() => ymdForSelectedDay() === toYmd(new Date()));
+const isDayPastOrTodayLocal = (day) => isYmdPastOrToday(ymdForWeekDay(selectedWeekStart.value, day));
 
 const loading = ref(false);
 const error = ref('');
@@ -538,13 +614,6 @@ const tasksMetaById = computed(() => {
   return map;
 });
 
-const weekendMultiplier = computed(() =>
-  Number(props.localized?.weekendMultiplier) > 0 ? Number(props.localized.weekendMultiplier) : 1
-);
-
-const pointLabel = (item, isMandatory) =>
-  pointLabelUtil(item, isMandatory, selectedDay.value, weekendMultiplier.value);
-
 function parseMysqlDateTime(input) {
   const raw = String(input || '').trim();
   if (!raw) return null;
@@ -554,23 +623,8 @@ function parseMysqlDateTime(input) {
   return Number.isNaN(d2.getTime()) ? null : d2;
 }
 
-function toYmd(d) {
-  if (!(d instanceof Date) || Number.isNaN(d.getTime())) return '';
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
 function ymdForSelectedDay() {
-  const start = childData.value?.week_range?.start || '';
-  if (!start) return '';
-  const base = new Date(`${start}T00:00:00`);
-  const offset = Object.prototype.hasOwnProperty.call(DAY_ORDER, Number(selectedDay.value))
-    ? DAY_ORDER[Number(selectedDay.value)]
-    : 0;
-  base.setDate(base.getDate() + offset);
-  return toYmd(base);
+  return ymdForWeekDay(selectedWeekStart.value, selectedDay.value);
 }
 
 const isTaskDone = (item) => {
@@ -673,53 +727,6 @@ const shiftTaskToChild = async (item, toChildId) => {
   }
 };
 
-const last7DaysEarned = computed(() => {
-  const hist = Array.isArray(pointsData.value?.history) ? pointsData.value.history : [];
-  if (!hist.length) {
-    // Fallback: if we don't have rolling history yet, week_summary is the closest available signal.
-    const earned = Number(pointsData.value?.week_summary?.earned);
-    if (Number.isFinite(earned)) return earned;
-    const fallback = Number(pointsData.value?.points_week);
-    return Number.isFinite(fallback) ? fallback : 0;
-  }
-  let sum = 0;
-  for (const entry of hist) {
-    const points = Number(entry?.points) || 0;
-    const type = String(entry?.type || '');
-    // Exclude reward spending, but keep penalties and all other +/- adjustments.
-    if (type === 'reward') continue;
-    sum += points;
-  }
-  return sum;
-});
-
-const todayEarned = computed(() => {
-  const hist = Array.isArray(pointsData.value?.history) ? pointsData.value.history : [];
-  if (!hist.length) {
-    const fallback = Number(pointsData.value?.points_today ?? childData.value?.points_today);
-    return Number.isFinite(fallback) ? fallback : 0;
-  }
-  const todayYmd = toYmd(new Date());
-  let sum = 0;
-  for (const entry of hist) {
-    const points = Number(entry?.points) || 0;
-    if (!points) continue;
-    const type = String(entry?.type || '');
-    // Exclude reward spending, but keep penalties and all other +/- adjustments.
-    if (type === 'reward') continue;
-
-    const d = parseMysqlDateTime(entry?.created_at) || new Date(String(entry?.created_at || ''));
-    const ymd = toYmd(d);
-    if (ymd !== todayYmd) continue;
-
-    sum += points;
-  }
-  return sum;
-});
-
-const last7DaysEarnedDisplay = computed(() => (Number(last7DaysEarned.value) || 0));
-const todayEarnedDisplay = computed(() => (Number(todayEarned.value) || 0));
-
 async function toggleStatus(item) {
   if (!isToday.value) return;
   // Toggle based on per-day done-state (same logic as ChildView).
@@ -771,7 +778,12 @@ async function toggleStatus(item) {
     // Update cached overview snapshot for this child/day so other pages can reuse it.
     try {
       if (childData.value) {
-        setCachedOverview(selectedChildId.value, selectedDay.value, childData.value);
+        setCachedOverview(
+          selectedChildId.value,
+          selectedDay.value,
+          childData.value,
+          selectedWeekStart.value
+        );
       }
     } catch {}
 
@@ -848,25 +860,49 @@ const loadPointsOverview = async ({ force = false, background = false } = {}) =>
 
 const loadChildData = async ({ force = false, background = false } = {}) => {
   if (!selectedChildId.value || !isParent.value) return;
-  // Load overview + points concurrently so sections don't "pop in" later.
+  const useBackground = background || !!childData.value;
   await Promise.allSettled([
     loadOverview({
       childId: selectedChildId.value,
       day: selectedDay.value,
+      weekStart: selectedWeekStart.value,
       force,
-      background,
+      background: useBackground,
     }),
-    loadPointsOverview({ force, background }),
+    loadPointsOverview({ force, background: useBackground || !!pointsData.value?.history }),
   ]);
 };
 
+let prefetchReqId = 0;
+const prefetchOverviewWeek = (childId, { skipDay = null, weekStart = null } = {}) => {
+  const cid = String(childId || '');
+  if (!cid) return;
+  const reqId = ++prefetchReqId;
+  const ws = weekStart || selectedWeekStart.value || getWeekStartForDate();
+  prefetchChildOverviewWeek(cid, api, { skipDay, weekStart: ws }).then(() => {
+    if (reqId !== prefetchReqId) return;
+  });
+};
+
 watch(
-  () => [selectedChildId.value, selectedDay.value],
+  () => [selectedChildId.value, selectedDay.value, selectedWeekStart.value],
   () => {
     closeShiftMenu();
     if (selectedChildId.value) {
-      loadChildData();
+      loadChildData({ background: !!childData.value });
+      prefetchOverviewWeek(selectedChildId.value, {
+        skipDay: selectedDay.value,
+        weekStart: selectedWeekStart.value,
+      });
     }
+  },
+  { immediate: true }
+);
+
+watch(
+  () => [isParent.value, props.appReady],
+  () => {
+    bootstrapOverview();
   },
   { immediate: true }
 );
@@ -882,18 +918,11 @@ onMounted(() => {
   syncMobile();
   try { window.addEventListener('resize', syncMobile); } catch {}
 
-  if (isParent.value && !hasExplicitChild.value) {
-    applyParentOverviewPreference();
-  }
-
-  // Refresh children list on mount + when login/logout happens (prevents stale "foreign" children after account switch)
-  loadChildren();
-  loadTasksCount();
   const onAuthChanged = () => {
     selectedChildId.value = '';
     clearOverviewPref();
-    loadChildren();
-    loadTasksCount();
+    error.value = '';
+    bootstrapOverview();
   };
   const offAuth = onRuAuthChanged(onAuthChanged);
 
@@ -916,10 +945,6 @@ onMounted(() => {
   };
   const offData = onRuDataChanged(onDataChanged);
 
-  if (!selectedChildId.value && children.value.length) {
-    selectedChildId.value = normalizeId(children.value[0].id);
-  }
-
   // Allow manual refresh when user clicks "Prehľad" again (route doesn't change).
   const onForce = () => {
     if (isParent.value && !hasExplicitChild.value) {
@@ -938,8 +963,10 @@ onMounted(() => {
 });
 
 onActivated(() => {
+  if (!isParent.value || !props.appReady) return;
+
   // Parent behavior: restore previous overview selection when available.
-  if (isParent.value && !hasExplicitChild.value) {
+  if (!hasExplicitChild.value) {
     applyParentOverviewPreference();
   }
 
@@ -947,17 +974,18 @@ onActivated(() => {
   try {
     if (localStorage.getItem('ru_overview_stale') === '1') {
       localStorage.removeItem('ru_overview_stale');
-      // Clear in-component state and refetch
       childData.value = null;
-      loadChildren();
-      loadTasksCount();
-      loadChildData({ force: true, background: true });
+      bootstrapOverview().then(() => {
+        loadChildData({ force: true, background: true });
+      });
       return;
     }
   } catch {}
-  // Even without the flag (e.g. child changed tasks on another device),
-  // revalidate overview on each return to this screen (background, no flicker).
-  loadChildData({ force: true, background: true });
+  if (childData.value) {
+    loadChildData({ force: true, background: true });
+    return;
+  }
+  loadChildData({ background: false });
 });
 
 onMounted(() => {
@@ -973,6 +1001,7 @@ const syncToday = () => {
   todayDay.value = now;
   if (Number(selectedDay.value) === prev) {
     selectedDay.value = now;
+    selectedWeekStart.value = getWeekStartForDate();
     loadChildData({ force: true, background: true });
   }
 };
@@ -1071,7 +1100,12 @@ const useReward = async (reward) => {
         }
 
         // Keep cache in sync for the currently selected day snapshot.
-        setCachedOverview(selectedChildId.value, selectedDay.value, childData.value);
+        setCachedOverview(
+          selectedChildId.value,
+          selectedDay.value,
+          childData.value,
+          selectedWeekStart.value
+        );
       }
     } catch {}
     // After marking a reward as used, the server state changes immediately,
@@ -1198,7 +1232,7 @@ const deletePointsEntry = async (entry) => {
 
 <style scoped>
 .ru-overview-card {
-  --ru-card-max-width: 1680px;
+  --ru-card-max-width: 760px;
 }
 
 .ru-overview-card .ru-card__body {
@@ -1211,6 +1245,7 @@ const deletePointsEntry = async (entry) => {
 
 .avatars-header {
   overflow-x: auto;
+  padding: 8px 0 4px;
 }
 
 .avatars-header.mobile-open {
@@ -1219,10 +1254,20 @@ const deletePointsEntry = async (entry) => {
   z-index: 70;
 }
 
+.ru-overview-avatars {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  width: 100%;
+  padding: 4px 0 8px;
+}
+
 .ru-overview-mobile-top {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   width: 100%;
   gap: 10px;
   padding: 2px 0;
@@ -1246,42 +1291,22 @@ const deletePointsEntry = async (entry) => {
 }
 
 .ru-mobile-child-btn {
-  border: 0px solid rgba(15, 23, 42, .1);
-  background: #f3f4f6;
+  border: 0;
+  background: transparent;
   border-radius: 14px;
-  min-height: 56px;
-  padding: 8px 12px;
+  min-height: 0;
+  padding: 4px 8px 4px 4px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   text-align: left;
-  /* box-shadow: 0 10px 24px -12px #0f172a33; */
-}
-
-.ru-mobile-child-btn .ru-avatar {
-  width: 42px;
-  height: 42px;
-  border-radius: 999px;
-  overflow: hidden;
-  display: grid;
-  place-items: center;
-  color: #ffffff;
-  font-size: 14px;
-  font-weight: 800;
-  flex-shrink: 0;
-}
-
-.ru-mobile-child-btn .ru-avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
 }
 
 .ru-mobile-child-name {
   order: 2;
   font-weight: 800;
   font-size: 18px;
-  line-height: 1;
+  line-height: 1.1;
   color: #0f172a;
   min-width: 0;
   white-space: nowrap;
@@ -1298,8 +1323,15 @@ const deletePointsEntry = async (entry) => {
   line-height: 1;
 }
 
-.ru-mobile-child-btn .ru-avatar {
+.ru-mobile-child-btn :deep(.ru-child-avatar-badge) {
   order: 1;
+  flex-shrink: 0;
+}
+
+.ru-mobile-child-avatar-hit {
+  order: 1;
+  flex-shrink: 0;
+  cursor: pointer;
 }
 
 .ru-mobile-child-menu {
@@ -1321,6 +1353,7 @@ const deletePointsEntry = async (entry) => {
   padding: 10px 12px;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
   font-weight: 700;
   color: #0f172a;
@@ -1328,50 +1361,33 @@ const deletePointsEntry = async (entry) => {
   box-shadow: 0 12px 24px -16px rgba(15, 23, 42, 0.35);
 }
 
-.ru-mobile-child-option .ru-avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 999px;
-  overflow: hidden;
-  display: grid;
-  place-items: center;
-  color: #ffffff;
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.ru-mobile-child-option .ru-avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
 .ru-mobile-child-option.active {
   background: #e0f2fe;
 }
 
-.ru-mobile-points-inline {
-  margin-left: auto;
-  border: 0;
-  background: transparent;
-  color: #d69116;
-  min-height: 78px;
-  padding: 0 4px 0 8px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-weight: 900;
+.ru-mobile-child-option__avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  border: 3px solid var(--child-accent, #0ea5e9);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 800;
+  flex-shrink: 0;
+  box-sizing: border-box;
 }
-
-.ru-mobile-points-inline__value {
-  font-size: 34px;
-  line-height: 1;
+.ru-mobile-child-option__avatar.active {
+  box-shadow:
+    0 0 0 2px #ffffff,
+    0 0 0 5px var(--child-accent, #0ea5e9);
 }
-
-.ru-mobile-points-inline__coin {
-  width: 22px;
-  height: 22px;
-  object-fit: contain;
+.ru-mobile-child-option__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 @keyframes ruDropDownIn {
@@ -1417,10 +1433,10 @@ const deletePointsEntry = async (entry) => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 6px;
+  gap: 8px;
+  padding: 6px 8px;
   border-radius: 12px;
-  min-width: 90px;
+  min-width: 104px;
 }
 .ru-avatar-btn:not(.active) {
   opacity: 0.55;
@@ -1430,86 +1446,43 @@ const deletePointsEntry = async (entry) => {
   background: transparent;
   opacity: 1;
 }
-.ru-avatar-btn .ru-avatar {
-  width: 50px;
-  height: 50px;
-  border-radius: 999px;
-  display: grid;
-  place-items: center;
-  font-weight: 700;
-  color: #fff;
-  font-size: 20px;
-  overflow: hidden;
-}
-.ru-avatar-btn.active .ru-avatar {
-  box-shadow:
-    0 0 0 3px #ffffff,
-    0 0 0 6px var(--ru-accent, #0ea5e9);
-}
-.ru-avatar-btn img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.ru-avatar-btn:not(.active) img {
+.ru-avatar-btn:not(.active) :deep(.ru-child-avatar-badge__avatar img) {
   filter: grayscale(1) saturate(0.1) contrast(0.95);
 }
-.ru-avatar-btn.active img {
+.ru-avatar-btn.active :deep(.ru-child-avatar-badge__avatar img) {
   filter: none;
 }
 .ru-avatar-name {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 700;
   color: #0f172a;
+  max-width: 110px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .ru-card__body {
   font-size: 16px;
 }
 
-.ru-overview-stats {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  margin: 30px 0;
+.ru-overview-points {
+  display: flex;
+  justify-content: center;
+  margin: 16px 0 24px;
 }
-.ru-stat-btn {
-  border: 1px solid rgba(15, 23, 42, 0.10);
-  background: #ffffff;
-  border-radius: 16px;
-  padding: 14px 14px 12px;
-  text-align: left;
+
+.ru-overview-points-btn {
+  border: 0;
+  background: transparent;
+  padding: 0;
   cursor: pointer;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
 }
-.ru-stat-btn:focus-visible {
+
+.ru-overview-points-btn:focus-visible {
   outline: 2px solid var(--ru-accent, #0ea5e9);
-  outline-offset: 2px;
-}
-.ru-stat-btn.featured {
-  background: var(--ru-accent, #0ea5e9);
-  border-color: transparent;
-  color: #ffffff;
-}
-.ru-stat-btn__label {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #64748b;
-}
-.ru-stat-btn.featured .ru-stat-btn__label {
-  color: rgba(255, 255, 255, 0.85);
-}
-.ru-stat-btn__value {
-  margin-top: 6px;
-  font-size: 26px;
-  font-weight: 800;
-  color: #d69116;
-  line-height: 1;
-}
-.ru-stat-btn.featured .ru-stat-btn__value {
-  color: #ffffff;
+  outline-offset: 4px;
+  border-radius: 999px;
 }
 
 /* ru-days-bar / ru-day-pill styles are global (ru-base.css) */
@@ -1610,10 +1583,32 @@ const deletePointsEntry = async (entry) => {
 .ru-task-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 24px;
   flex-wrap: nowrap;
-  padding: 10px 5px;
+  padding: 10px 8px;
   background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+}
+.ru-task__icon-wrap {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.ru-task__icon {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.ru-task-body {
+  flex: 1;
+  min-width: 0;
 }
 .ru-task-title {
   font-weight: 600;
@@ -1625,11 +1620,17 @@ const deletePointsEntry = async (entry) => {
   min-width: 0;
 }
 .ru-task-title-wrap {
-  flex: 1;
   min-width: 0;
   display: inline-flex;
   align-items: center;
   gap: 2px;
+  max-width: 100%;
+}
+.ru-task-points-sub {
+  margin-top: 2px;
+  font-weight: 700;
+  font-size: 13px;
+  color: #16a34a;
 }
 .ru-inline-rotate-wrap {
   position: relative;
@@ -1698,16 +1699,6 @@ const deletePointsEntry = async (entry) => {
   color: #64748b;
   padding: 4px 6px;
 }
-.ru-task-points {
-  font-weight: 700;
-  color: #d69116;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  white-space: nowrap;
-  flex-shrink: 0;
-  margin-left: auto;
-}
 .ru-inline-rotate-error {
   margin-top: 8px;
   font-size: 12px;
@@ -1715,49 +1706,21 @@ const deletePointsEntry = async (entry) => {
   font-weight: 700;
 }
 .ru-status-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: #e2e8f0;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: 2px solid #d1d5db;
+  background: #f8fafc;
   flex-shrink: 0;
 }
 .ru-status-dot.done {
+  border-color: var(--ru-accent, #0ea5e9);
   background: var(--ru-accent, #0ea5e9);
 }
 
 .ru-task-check {
-  width: 28px;
-  height: 28px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.ru-task-check input {
-  display: none;
-}
-.ru-task-check span {
-  width: 18px;
-  height: 18px;
-  border-radius: 6px;
-  border: 2px solid var(--ru-accent, #0ea5e9);
-  display: inline-block;
-  position: relative;
-  background: #ffffff;
-}
-.ru-task-check input:checked + span {
-  background: var(--ru-accent, #0ea5e9);
-}
-.ru-task-check input:checked + span::after {
-  content: '';
-  position: absolute;
-  top: 1px;
-  left: 5px;
-  width: 4px;
-  height: 9px;
-  border: solid white;
-  border-width: 0 2px 2px 0;
-  transform: rotate(45deg);
+  width: 36px;
+  height: 36px;
 }
 
 .ru-section__header {
@@ -2035,21 +1998,12 @@ const deletePointsEntry = async (entry) => {
   .ru-task-points {
     font-size: 16px;
   }
-  .ru-overview-stats {
-    gap: 10px;
-  }
-  .ru-stat-btn__value {
-    font-size: 22px;
-  }
   .ru-earned-reward-card {
     width: 140px;
   }
 }
 
 @media (max-width: 1200px) {
-  .ru-overview-card {
-    --ru-card-max-width: 1200px;
-  }
   .ru-overview-kiosk-grid {
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   }

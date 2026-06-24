@@ -5,6 +5,7 @@ import {
   getCachedOverviewAgeMs,
   setCachedOverview,
 } from '../state/preloadCache';
+import { applyWeekendMultiplierFromPayload } from '../state/weekendMultiplier';
 
 /**
  * Shared loader for "child overview" payload used by both:
@@ -29,9 +30,10 @@ export function useChildOverview({
 
   let reqId = 0;
 
-  const load = async ({ childId, day, force = false, background = false } = {}) => {
+  const load = async ({ childId, day, weekStart = '', force = false, background = false } = {}) => {
     const cid = String(childId || '');
     const d = day === null || day === undefined ? null : Number(day);
+    const ws = String(weekStart || '');
     const myReqId = ++reqId;
 
     if (!cid) {
@@ -43,17 +45,23 @@ export function useChildOverview({
       return null;
     }
 
-    const cached = getCachedOverview(cid, d);
-    const age = getCachedOverviewAgeMs(cid, d);
+    const cached = getCachedOverview(cid, d, ws);
+    const age = getCachedOverviewAgeMs(cid, d, ws);
 
     // Show cached immediately (instant UI); refresh in background when stale.
     if (cached && !force) {
       if (myReqId === reqId) {
         data.value = cached;
+        applyWeekendMultiplierFromPayload(cached);
         error.value = '';
         loading.value = false;
       }
       if (Number.isFinite(age) && age < revalidateMs) return cached;
+      background = true;
+    }
+
+    // Keep current UI visible while fetching another day / revalidating.
+    if (data.value && !force) {
       background = true;
     }
 
@@ -63,10 +71,11 @@ export function useChildOverview({
     }
 
     try {
-      const fresh = await api.getChildOverview(cid, d);
+      const fresh = await api.getChildOverview(cid, d, ws || null);
       if (myReqId !== reqId) return null;
       data.value = fresh;
-      setCachedOverview(cid, d, fresh);
+      applyWeekendMultiplierFromPayload(fresh);
+      setCachedOverview(cid, d, fresh, ws || fresh?.week_range?.start || '');
       return fresh;
     } catch (e) {
       if (myReqId !== reqId) return null;

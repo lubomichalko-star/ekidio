@@ -1,6 +1,6 @@
 <template>
   <section class="ru-card ru-admin-card">
-    <div class="ru-card__body" v-if="loading">Načítavam…</div>
+    <div class="ru-card__body" v-if="loading && !children.length">Načítavam…</div>
     <div class="ru-card__body" v-else-if="error">
       <p class="ru-error">{{ error }}</p>
     </div>
@@ -36,22 +36,26 @@
         <div class="ru-family-section__header">
           <h3>Deti</h3>
         </div>
-        <div class="ru-children-list" ref="listEl">
+        <div class="ru-task-list" ref="listEl">
           <div
-            class="ru-child-card"
+            class="ru-task-item ru-child-card"
             v-for="child in children"
             :key="child.id"
             :data-id="child.id"
             @click="editChild(child)"
           >
+            <div class="ru-task-item__icon-wrap">
+              <div class="ru-avatar ru-avatar--list" :style="{ background: child.color || '#0ea5e9' }">
+                <span v-if="!child.avatar_url">{{ child.name.charAt(0) }}</span>
+                <img v-else :src="child.avatar_url" :alt="child.name" />
+              </div>
+            </div>
+            <div class="ru-task-item__body">
+              <div class="ru-task-item__title">{{ child.name }}</div>
+            </div>
             <span class="ru-drag-handle" role="button" aria-label="Presunúť" tabindex="0" @click.stop>
               ⋮⋮
             </span>
-            <div class="ru-avatar ru-avatar--card" :style="{ background: child.color || '#0ea5e9' }">
-              <span v-if="!child.avatar_url">{{ child.name.charAt(0) }}</span>
-              <img v-else :src="child.avatar_url" :alt="child.name" />
-            </div>
-            <div class="ru-child-card__name">{{ child.name }}</div>
           </div>
         </div>
       </div>
@@ -64,26 +68,28 @@
           </button>
         </div>
 
-        <div class="ru-family-members" v-if="familyMembers.length || invites.length || familyMembersLoading || invitesLoading">
-          <div class="ru-family-member-card" v-for="member in familyMembers" :key="`member-${member.user_id}`">
-            <div class="ru-family-member-card__avatar">
-              {{ String(member.display_name || '?').charAt(0) }}
-            </div>
-            <div class="ru-family-member-card__main">
-              <div class="ru-family-member-card__name">
-                {{ member.display_name || 'Dospelý člen' }}
+        <div class="ru-task-list" v-if="familyMembers.length || invites.length || familyMembersLoading || invitesLoading">
+          <div class="ru-task-item ru-family-member-row" v-for="member in familyMembers" :key="`member-${member.user_id}`">
+            <div class="ru-task-item__icon-wrap">
+              <div class="ru-family-member-row__avatar">
+                {{ String(member.display_name || '?').charAt(0) }}
               </div>
-              <div class="ru-family-member-card__meta">{{ member.email || 'Člen rodiny' }}</div>
             </div>
-            <div class="ru-family-member-card__badge" v-if="member.is_owner">Správca</div>
+            <div class="ru-task-item__body">
+              <div class="ru-task-item__title">{{ member.display_name || 'Dospelý člen' }}</div>
+              <div class="ru-task-item__desc">{{ member.email || 'Člen rodiny' }}</div>
+            </div>
+            <div class="ru-family-member-row__badge" v-if="member.is_owner">Správca</div>
           </div>
 
-          <div class="ru-family-member-card ru-family-member-card--invite" v-for="inv in invites" :key="`invite-${inv.id}`">
-            <div class="ru-family-member-card__avatar ru-family-member-card__avatar--invite">✉</div>
-            <div class="ru-family-member-card__main">
-              <div class="ru-family-member-card__name">{{ inv.email }}</div>
-              <div class="ru-family-member-card__meta" v-if="inv.expires_at">Pozvánka odoslaná · platí do {{ inv.expires_at }}</div>
-              <div class="ru-family-member-card__meta" v-else>Pozvánka odoslaná</div>
+          <div class="ru-task-item ru-family-member-row ru-family-member-row--invite" v-for="inv in invites" :key="`invite-${inv.id}`">
+            <div class="ru-task-item__icon-wrap">
+              <div class="ru-family-member-row__avatar ru-family-member-row__avatar--invite">✉</div>
+            </div>
+            <div class="ru-task-item__body">
+              <div class="ru-task-item__title">{{ inv.email }}</div>
+              <div class="ru-task-item__desc" v-if="inv.expires_at">Pozvánka odoslaná · platí do {{ inv.expires_at }}</div>
+              <div class="ru-task-item__desc" v-else>Pozvánka odoslaná</div>
             </div>
             <button class="ru-btn ghost danger ru-btn--sm" type="button" @click="revokeInvite(inv.id)">
               Zrušiť
@@ -230,6 +236,7 @@ import { childrenApi } from '../api/children';
 import { api } from '../api/client';
 import RuModal from '../components/RuModal.vue';
 import Sortable from 'sortablejs';
+import { getCachedChildren, setCachedChildren } from '../state/preloadCache';
 
 const route = useRoute();
 const router = useRouter();
@@ -266,9 +273,21 @@ const listEl = ref(null);
 let sortable = null;
 const savingOrder = ref(false);
 
-const loadChildren = async () => {
-  loading.value = true;
-  error.value = '';
+const loadChildren = async ({ force = false, background = false } = {}) => {
+  const cached = getCachedChildren();
+  if (!force && Array.isArray(cached)) {
+    children.value = cached;
+    loading.value = false;
+    await nextTick();
+    initSortable();
+    loadChildren({ force: true, background: true });
+    return;
+  }
+
+  if (!background) {
+    loading.value = true;
+    error.value = '';
+  }
   try {
     const [childrenRes, membersRes, invitesRes] = await Promise.allSettled([
       childrenApi.list(),
@@ -278,6 +297,7 @@ const loadChildren = async () => {
 
     if (childrenRes.status === 'fulfilled') {
       children.value = Array.isArray(childrenRes.value) ? childrenRes.value : [];
+      setCachedChildren(children.value);
     } else {
       throw childrenRes.reason;
     }
@@ -289,12 +309,13 @@ const loadChildren = async () => {
       ? invitesRes.value
       : [];
   } catch (e) {
-    error.value = e?.message || 'Chyba pri načítaní detí';
+    if (!background) error.value = e?.message || 'Chyba pri načítaní detí';
   } finally {
-    loading.value = false;
-    // Wait until the list is actually rendered (v-if depends on loading).
-    await nextTick();
-    initSortable();
+    if (!background) {
+      loading.value = false;
+      await nextTick();
+      initSortable();
+    }
   }
 };
 
@@ -547,7 +568,7 @@ onMounted(async () => {
 });
 
 onActivated(() => {
-  // When KeepAlive is enabled, onMounted won't run again on return.
+  loadChildren({ force: true, background: !!children.value.length });
   handleAddQuery();
 });
 
@@ -651,36 +672,67 @@ onBeforeUnmount(() => {
     flex-direction: column;
   }
 }
-.ru-children-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 14px;
-}
-.ru-child-card {
-  position: relative;
+.ru-task-list {
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: 10px;
-  padding: 16px 12px 14px;
-  border-radius: 16px;
+}
+.ru-task-item {
+  width: 100%;
   border: 1px solid rgba(15, 23, 42, 0.10);
+  border-radius: 16px;
+  padding: 12px 14px;
   background: #ffffff;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
   cursor: pointer;
-  user-select: none;
-  text-align: center;
+  text-align: left;
+  overflow: hidden;
+}
+.ru-task-item__icon-wrap {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.ru-task-item__body {
+  min-width: 0;
+  flex: 1;
+}
+.ru-task-item__title {
+  font-weight: 600;
+  font-size: 16px;
+  color: #0f172a;
+  line-height: 1.2;
+}
+.ru-task-item__desc {
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.25;
+  display: -webkit-box;
+  line-clamp: 2;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .ru-child-card--ghost {
   opacity: 0.7;
+}
+.ru-child-card {
+  user-select: none;
 }
 .ru-child-card--drag {
   opacity: 0.95;
 }
 .ru-drag-handle {
-  position: absolute;
-  top: 10px;
-  right: 10px;
   width: 34px;
   height: 34px;
   border-radius: 10px;
@@ -691,52 +743,33 @@ onBeforeUnmount(() => {
   cursor: grab;
   display: grid;
   place-items: center;
+  flex-shrink: 0;
 }
 .ru-drag-handle:active {
   cursor: grabbing;
 }
-.ru-avatar--card {
-  width: 104px;
-  height: 104px;
+.ru-avatar--list {
+  width: 48px;
+  height: 48px;
   border-radius: 999px;
   display: grid;
   place-items: center;
   color: #fff;
   font-weight: 900;
-  font-size: 34px;
+  font-size: 18px;
   overflow: hidden;
 }
-.ru-avatar--card img {
+.ru-avatar--list img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
-.ru-child-card__name {
-  font-weight: 800;
-  color: #0f172a;
-  font-size: 16px;
-  line-height: 1.25;
-  width: 100%;
-  word-break: break-word;
+.ru-family-member-row {
+  cursor: default;
 }
-.ru-family-members {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.ru-family-member-card {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px;
-  border-radius: 16px;
-  border: 1px solid rgba(15, 23, 42, 0.10);
-  background: #ffffff;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
-}
-.ru-family-member-card__avatar {
-  width: 46px;
-  height: 46px;
+.ru-family-member-row__avatar {
+  width: 48px;
+  height: 48px;
   border-radius: 999px;
   display: grid;
   place-items: center;
@@ -744,30 +777,12 @@ onBeforeUnmount(() => {
   color: #fff;
   font-weight: 900;
   font-size: 18px;
-  flex-shrink: 0;
 }
-.ru-family-member-card__avatar--invite {
+.ru-family-member-row__avatar--invite {
   background: #f8fafc;
   color: #475569;
 }
-.ru-family-member-card__main {
-  min-width: 0;
-  flex: 1;
-}
-.ru-family-member-card__name {
-  font-weight: 800;
-  color: #0f172a;
-  font-size: 15px;
-  word-break: break-word;
-}
-.ru-family-member-card__meta {
-  margin-top: 2px;
-  color: #64748b;
-  font-weight: 700;
-  font-size: 12px;
-  word-break: break-word;
-}
-.ru-family-member-card__badge {
+.ru-family-member-row__badge {
   padding: 6px 10px;
   border-radius: 999px;
   background: #f1f5f9;
@@ -776,7 +791,7 @@ onBeforeUnmount(() => {
   font-size: 12px;
   flex-shrink: 0;
 }
-.ru-family-member-card--invite {
+.ru-family-member-row--invite {
   align-items: flex-start;
 }
 .ru-family-note {
@@ -949,24 +964,14 @@ onBeforeUnmount(() => {
 /* ru-modal-actions is global (ru-base.css) */
 
 @media (max-width: 640px) {
-  .ru-children-list {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-  }
   .ru-avatar-preview {
     padding: 16px 12px;
   }
-  .ru-family-member-card {
-    align-items: flex-start;
+  .ru-family-member-row--invite {
     flex-wrap: wrap;
   }
-  .ru-family-member-card__badge {
-    margin-left: 58px;
-  }
-  .ru-avatar--card {
-    width: 96px;
-    height: 96px;
-    font-size: 30px;
+  .ru-family-member-row--invite .ru-btn {
+    margin-left: 60px;
   }
 }
 </style>

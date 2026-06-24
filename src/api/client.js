@@ -53,6 +53,12 @@ export const api = {
     });
   },
 
+  forgotPassword: async (email) => {
+    return http.post('/auth/forgot-password', {
+      email: String(email || '').trim(),
+    });
+  },
+
   loginWithGoogle: async (credential) => {
     const res = await http.post('/auth/google', {
       credential: String(credential || '').trim(),
@@ -62,8 +68,6 @@ export const api = {
       setStoredAuth({ role: 'parent', childId: '' });
       dispatchAuthChanged({ role: 'parent', childId: '' });
     }
-    // Confirm the fresh token immediately on web/native before the app redirects away from login.
-    await http.get('/auth/me');
     return res;
   },
 
@@ -129,9 +133,12 @@ export const api = {
     );
   },
 
-  getChildOverview: async (childId, day = null) => {
+  getChildOverview: async (childId, day = null, weekStart = null) => {
     try {
-      return await http.get('/child/overview', { query: { child_id: childId || 0, day } });
+      const query = { child_id: childId || 0 };
+      if (day !== null && day !== undefined) query.day = day;
+      if (weekStart) query.week_start = weekStart;
+      return await http.get('/child/overview', { query });
     } catch (e) {
       // Only clear session for child role (deleted child) or true auth failure.
       try {
@@ -186,6 +193,14 @@ export const api = {
     });
   },
 
+  deleteParentAccount: async ({ currentPassword = '', confirmText = '' } = {}) => {
+    await requireToken();
+    return http.post('/parent/account/delete', {
+      current_password: String(currentPassword || ''),
+      confirm_text: String(confirmText || ''),
+    });
+  },
+
   regenerateWeek: () => http.post('/admin/regenerate-week', {}),
   shiftRotation: () => http.post('/admin/shift-rotation', {}),
 
@@ -196,6 +211,7 @@ export const api = {
       day: String(day || 'monday'),
     }),
 
+  getWeekendMultiplier: () => http.get('/admin/weekend-multiplier'),
   saveWeekendMultiplier: (multiplier) =>
     http.post('/admin/weekend-multiplier', { multiplier }),
 

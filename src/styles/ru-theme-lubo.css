@@ -1,0 +1,237 @@
+/* Lubo (default) visual theme */
+.ru-theme-lubo {
+  --ru-accent: #5abb6f;
+  --ru-accent-light: #5abb6f33;
+  --ru-bg: #f3f4f6;
+  --ru-text: #0f172a;
+  --ru-muted: #64748b;
+  --ru-border: rgba(15, 23, 42, 0.10);
+  --ru-radius-md: 14px;
+  --ru-radius-lg: 16px;
+  --ru-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --ru-shadow-accent: 0 20px 40px -20px rgba(90, 187, 111, 0.70);
+  --font-family-base: 'Manrope', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.ru-theme-lubo .ru-card {
+  padding: var(--ru-card-padding, 0 14px 16px);
+  max-width: var(--ru-card-max-width, 760px);
+}
+
+@media (max-width: 768px) {
+  .ru-theme-lubo .ru-card {
+    padding: var(--ru-card-padding-mobile, 0 12px 14px);
+  }
+}
+
+.ru-theme-lubo .ru-card__header {
+  background: transparent;
+  padding: 8px 0;
+}
+
+.ru-theme-lubo .ru-card__subtitle {
+  margin: 2px 0 0;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.ru-theme-lubo .ru-card__body {
+  color: #374151;
+  font-size: 14px;
+}
+
+.ru-theme-lubo .ru-section__header h3 {
+  margin: 20px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #bebebe;
+}
+
+.ru-theme-lubo .ru-admin-card .ru-card__body > .ru-task-list:first-child {
+  margin-top: 54px;
+}
+
+.ru-theme-lubo .ru-btn {
+  border: 1px solid transparent;
+  border-radius: var(--ru-radius-md);
+  padding: 10px 14px;
+  font-size: 14px;
+  font-weight: 800;
+  font-family: var(--font-family-base);
+  cursor: pointer;
+  background: var(--ru-accent);
+  color: #fff;
+}
+
+.ru-theme-lubo .ru-btn--primary {
+  background: var(--ru-accent);
+  color: #fff;
+  box-shadow: var(--ru-shadow-sm);
+}
+
+.ru-theme-lubo .ru-btn.ghost,
+.ru-theme-lubo .ru-btn--ghost {
+  background: #fff;
+  color: var(--ru-text);
+  border-color: var(--ru-border);
+  box-shadow: none;
+}
+
+.ru-theme-lubo .ru-btn.danger {
+  background: #fff;
+  color: #b91c1c;
+  border-color: #fecaca;
+  box-shadow: none;
+}
+
+.ru-theme-lubo .ru-btn.ghost.danger,
+.ru-theme-lubo .ru-btn--ghost.danger {
+  background: transparent;
+  color: #b91c1c;
+  border-color: #fecaca;
+  box-shadow: none;
+}
+
+.ru-theme-lubo .ru-chip {
+  background: var(--ru-accent);
+  color: #fff;
+  font-weight: 600;
+  font-size: 12px;
+  box-shadow: 0 10px 25px -15px rgba(14, 165, 233, 0.8);
+}
+
+.ru-theme-lubo .ru-chip--points {
+  background: var(--ru-accent-light);
+  color: #d69116;
+  box-shadow: 0 10px 25px -15px rgba(15, 23, 42, 0.18);
+}
+
+.ru-theme-lubo .ru-day-nav {
+  border: 1px solid #e5e7eb;
+  background: #f8fafc;
+  border-radius: 10px;
+  color: #94a3b8;
+}
+
+.ru-theme-lubo .ru-day-pill {
+  border: 1px solid #e5e7eb;
+  background: #f8fafc;
+  border-radius: 12px;
+  color: #cdcdcd;
+}
+
+.ru-theme-lubo .ru-day-pill.active {
+  background: var(--ru-accent);
+  color: #fff;
+  border-color: var(--ru-accent);
+}
+
+/* Stano shell: hide Lubo-only nav icons */
+.ru-theme-stano .ru-tab__icon {
+  display: none;
+}
+.ru-theme-stano .ru-tab__img {
+  display: block;
+  width: 22px;
+  height: 22px;
+}
+.ru-theme-lubo .ru-tab__img {
+  display: none;
+}
+
+.ru-theme-stano .ru-app__hero {
+  display: block;
+}
+.ru-theme-lubo .ru-app__hero {
+  display: none;
+}
+
+.ru-theme-stano .ru-app__content-wrap {
+  width: var(--layout-content-ratio, 66.666%);
+  max-width: 1000px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 20;
+}
+
+.ru-theme-lubo .ru-app__content-wrap {
+  width: 100%;
+}
+
+.ru-theme-lubo .ru-app__header + .ru-app__main {
+  padding-top: 14px;
+}
+
+.ru-theme-lubo .ru-card {
+  margin: 0 auto;
+}
+
+.ru-theme-stano .ru-app {
+  font-family: var(--font-family-base);
+  color: var(--bluegrey-900);
+  background: var(--white-100);
+}
+
+.ru-theme-stano .ru-app__header {
+  background: var(--white-100);
+  color: var(--bluegrey-900);
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.06);
+}
+
+.ru-theme-stano .ru-nav__item {
+  background: transparent;
+  color: var(--bluegrey-700);
+  font-weight: var(--font-weight-bold);
+}
+
+.ru-theme-stano .ru-nav__item.router-link-active {
+  background: var(--primary-50);
+  color: var(--bluegrey-900);
+}
+
+.ru-theme-stano .ru-app__hero {
+  width: 100%;
+  min-height: 300px;
+  max-height: 300px;
+  height: 300px;
+  overflow: hidden;
+  position: relative;
+  margin-top: -110px;
+  background: var(--ru-hero-bg, var(--primary-opacity-40)) url('../images/bg-ekidio-gray.svg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.ru-theme-stano .ru-app__title-wrap {
+  width: var(--layout-content-ratio, 66.666%);
+  max-width: 1000px;
+  margin: 0 auto;
+  padding-top: 140px;
+}
+
+.ru-theme-stano .ru-app__title {
+  margin: 0;
+  font-family: var(--font-family-base);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-headline-1);
+  line-height: var(--line-height-headline-1);
+  color: var(--bluegrey-900);
+}
+
+.ru-theme-stano .ru-bottom-nav .ru-tab.router-link-active {
+  color: var(--bluegrey-900);
+  background: var(--primary-50);
+}
+
+.ru-theme-stano .ru-nav__item-icon img {
+  height: 24px;
+  width: auto;
+}
+
+.ru-theme-stano .ru-nav__divider {
+  height: 24px;
+  width: auto;
+}

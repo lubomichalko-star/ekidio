@@ -3,8 +3,8 @@
   "appName": "ekidio",
   "webDir": "dist",
   "allowNavigation": [
-    "lubomichalko.com",
-    "*.lubomichalko.com"
+    "ekidio.com",
+    "*.ekidio.com"
   ],
   "plugins": {
     "StatusBar": {

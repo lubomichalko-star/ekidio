@@ -3,7 +3,7 @@
  * Plugin Name: ekidio
  * Plugin URI: https://example.com/ekidio
  * Description: Týždenný plán rodinných domácich prác s automatickou rotáciou úloh medzi deťmi
- * Version: 1.0.0
+ * Version: 1.8.2
  * Author: Your Name
  * Author URI: https://example.com
  * Text Domain: rodinne-ulohy
@@ -17,7 +17,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('RODINNE_ULOHY_VERSION', '1.0.0');
+define('RODINNE_ULOHY_VERSION', '1.8.2');
 define('RODINNE_ULOHY_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('RODINNE_ULOHY_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('RODINNE_ULOHY_PLUGIN_BASENAME', plugin_basename(__FILE__));

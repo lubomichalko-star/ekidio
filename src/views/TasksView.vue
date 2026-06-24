@@ -4,7 +4,7 @@
       <p class="ru-error">Prístup len pre rodiča.</p>
     </div>
 
-    <div class="ru-card__body" v-else-if="loading">Načítavam…</div>
+    <div class="ru-card__body" v-else-if="loading && !tasks.length">Načítavam…</div>
     <div class="ru-card__body" v-else-if="error">
       <p class="ru-error">{{ error }}</p>
     </div>
@@ -118,29 +118,21 @@
           type="button"
           @click="editTask(task)"
         >
-          <div class="ru-task-item__top">
-            <div class="ru-task-item__main">
-              <div class="ru-task-item__title">{{ task.name }}</div>
-              <div class="ru-task-item__desc" v-if="task.description">{{ task.description }}</div>
-            </div>
-            <div class="ru-task-item__points">
-              <span class="ru-task-item__points-value">{{ task.rating || 0 }}</span>
-              <img :src="coinIcon" alt="" class="ru-coin" />
-            </div>
+          <div class="ru-task-item__icon-wrap">
+            <img
+              v-if="taskIconUrl(task)"
+              :src="taskIconUrl(task)"
+              alt=""
+              class="ru-task-item__icon"
+            />
           </div>
-          <div class="ru-task-item__children" v-if="taskCardChildren(task).length">
-            <div class="ru-task-item__avatars">
-              <div
-                v-for="child in taskCardChildren(task)"
-                :key="`task-${task.id}-child-${child.id}`"
-                class="ru-task-item__avatar"
-                :style="{ background: child.color || '#0ea5e9' }"
-                :title="child.name"
-              >
-                <span v-if="!child.avatar_url">{{ String(child.name || '?').charAt(0) }}</span>
-                <img v-else :src="child.avatar_url" :alt="child.name || 'Dieťa'" />
-              </div>
-            </div>
+          <div class="ru-task-item__body">
+            <div class="ru-task-item__title">{{ task.name }}</div>
+            <div class="ru-task-item__desc" v-if="task.description">{{ task.description }}</div>
+          </div>
+          <div class="ru-task-item__points">
+            <img :src="coinIcon" alt="" class="ru-coin" />
+            <span class="ru-task-item__points-value">{{ task.rating || 0 }}</span>
           </div>
         </button>
 
@@ -185,6 +177,22 @@
       @close="closeModal"
     >
           <div class="ru-form-section ru-form-section--task-main">
+            <div class="ru-field" v-if="taskIconOptions.length">
+              <span class="ru-field__label">Ikona</span>
+              <div class="ru-task-icon-picker">
+                <button
+                  v-for="opt in taskIconOptions"
+                  :key="opt.id"
+                  type="button"
+                  class="ru-task-icon-picker__btn"
+                  :class="{ active: form.icon === opt.id }"
+                  :title="opt.id"
+                  @click="form.icon = opt.id"
+                >
+                  <img :src="opt.url" :alt="opt.id" />
+                </button>
+              </div>
+            </div>
             <label class="ru-field">
               <span class="ru-field__label">Názov úlohy</span>
               <input v-model="form.name" type="text" />
@@ -384,6 +392,8 @@ import { tasksApi } from '../api/tasks';
 import { childrenApi } from '../api/children';
 import coinPng from '../images/star.png';
 import RuModal from '../components/RuModal.vue';
+import { getDefaultTaskIconId, getTaskIconUrl, taskIconOptions } from '../lib/taskIcons';
+import { getCachedChildren, getCachedTasks, setCachedChildren, setCachedTasks } from '../state/preloadCache';
 
 const props = defineProps({
   role: { type: String, default: 'child' },
@@ -435,6 +445,7 @@ const form = ref({
   shared_task: 0,
   days_of_week: ['1', '2', '3', '4', '5'],
   assigned_children: [],
+  icon: getDefaultTaskIconId(),
 });
 
 const assignmentMode = computed({
@@ -512,6 +523,8 @@ const isSharedTask = (task) => Number(task?.shared_task) === 1;
 // Consider shared_task as "nerotuje" (legacy data / old mode "pre všetky")
 const isRotateTask = (task) => Number(task?.rotation_enabled) === 1 && !isSharedTask(task);
 
+const taskIconUrl = (task) => getTaskIconUrl(task?.icon);
+
 const getAssignedChildIds = (task) => {
   // prefer expanded children objects
   if (Array.isArray(task?.children)) {
@@ -534,21 +547,6 @@ const getAssignedChildIds = (task) => {
   }
   return [];
 };
-
-const childrenById = computed(() => {
-  const map = new Map();
-  for (const child of Array.isArray(children.value) ? children.value : []) {
-    const id = Number(child?.id || 0);
-    if (!id) continue;
-    map.set(id, child);
-  }
-  return map;
-});
-
-const taskCardChildren = (task) =>
-  getAssignedChildIds(task)
-    .map((id) => childrenById.value.get(id))
-    .filter(Boolean);
 
 const taskMode = (task) => (isRotateTask(task) ? 'rotate' : 'norotate');
 
@@ -599,14 +597,36 @@ const displayTasks = computed(() => {
   return list.sort((a, b) => coll.compare(a?.name || '', b?.name || ''));
 });
 
-const loadData = async () => {
-  loading.value = true;
-  error.value = '';
+const loadData = async ({ force = false, background = false } = {}) => {
+  if (!isParent.value) return;
+
+  const cachedTasks = getCachedTasks();
+  const cachedChildren = getCachedChildren();
+  if (!force && Array.isArray(cachedTasks) && Array.isArray(cachedChildren)) {
+    tasks.value = cachedTasks;
+    children.value = cachedChildren;
+    loading.value = false;
+    if (
+      selectedChildId.value &&
+      !children.value.find((c) => String(c.id) === String(selectedChildId.value))
+    ) {
+      selectedChildId.value = '';
+    }
+    loadData({ force: true, background: true });
+    return;
+  }
+
+  if (!background) {
+    loading.value = true;
+    error.value = '';
+  }
   try {
     [tasks.value, children.value] = await Promise.all([
       tasksApi.list(),
       childrenApi.list()
     ]);
+    setCachedTasks(tasks.value);
+    setCachedChildren(children.value);
     // keep selected child valid
     if (
       selectedChildId.value &&
@@ -615,9 +635,9 @@ const loadData = async () => {
       selectedChildId.value = '';
     }
   } catch (e) {
-    error.value = e?.message || 'Chyba pri načítaní úloh';
+    if (!background) error.value = e?.message || 'Chyba pri načítaní úloh';
   } finally {
-    loading.value = false;
+    if (!background) loading.value = false;
   }
 };
 
@@ -682,6 +702,7 @@ const startAdd = () => {
     shared_task: 0,
     days_of_week: ['1', '2', '3', '4', '5'],
     assigned_children: [],
+    icon: getDefaultTaskIconId(),
   };
   showModal.value = true;
 };
@@ -699,6 +720,7 @@ const editTask = (task) => {
     shared_task: 0,
     days_of_week: (task.days_of_week || '').split(',').filter(Boolean),
     assigned_children: (task.children || []).map((c) => c.id),
+    icon: task.icon || getDefaultTaskIconId(),
   };
   showModal.value = true;
 };
@@ -846,7 +868,9 @@ const handleAddQuery = () => {
 };
 
 onActivated(() => {
-  // When KeepAlive is enabled, onMounted won't run again on return.
+  if (isParent.value) {
+    loadData({ force: true, background: !!tasks.value.length });
+  }
   handleAddQuery();
 });
 </script>
@@ -1087,31 +1111,41 @@ onActivated(() => {
   grid-template-columns: 1fr 1fr;
 }
 .ru-task-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 .ru-task-item {
   width: 100%;
   border: 1px solid rgba(15, 23, 42, 0.10);
   border-radius: 16px;
-  padding: 14px;
+  padding: 12px 14px;
   background: #ffffff;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
+  flex-direction: row;
+  align-items: center;
   gap: 12px;
   cursor: pointer;
   text-align: left;
+  overflow: hidden;
 }
-.ru-task-item__top {
+.ru-task-item__icon-wrap {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
 }
-.ru-task-item__main {
+.ru-task-item__icon {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.ru-task-item__body {
   min-width: 0;
   flex: 1;
 }
@@ -1136,58 +1170,41 @@ onActivated(() => {
 .ru-task-item__points {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   flex-shrink: 0;
   align-self: flex-start;
-  padding: 8px 10px;
-  border-radius: 999px;
-  background: #f8fafc;
+  padding-top: 2px;
 }
 .ru-task-item__points-value {
   font-weight: 700;
   font-size: 16px;
   color: #0f172a;
 }
-.ru-task-item__children {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
+.ru-task-icon-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+  gap: 8px;
 }
-.ru-task-item__avatars {
-  display: flex;
-  align-items: center;
-  padding-left: 6px;
-}
-.ru-task-item__avatar {
-  width: 28px;
-  height: 28px;
-  border-radius: 999px;
-  overflow: hidden;
+.ru-task-icon-picker__btn {
+  width: 100%;
+  aspect-ratio: 1;
+  border: 2px solid rgba(15, 23, 42, 0.10);
+  border-radius: 12px;
+  background: #f8fafc;
+  padding: 8px;
+  cursor: pointer;
   display: grid;
   place-items: center;
-  color: #fff;
-  font-weight: 900;
-  font-size: 12px;
-  border: 2px solid #ffffff;
-  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.08);
-  margin-left: -6px;
 }
-.ru-task-item__avatar:first-child {
-  margin-left: 0;
+.ru-task-icon-picker__btn.active {
+  border-color: #0ea5e9;
+  background: #e0f2fe;
+  box-shadow: 0 0 0 1px rgba(14, 165, 233, 0.25);
 }
-.ru-task-item__avatar img {
+.ru-task-icon-picker__btn img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
-}
-@media (max-width: 640px) {
-  .ru-task-list {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .ru-task-item__top {
-    flex-direction: column;
-  }
+  object-fit: contain;
 }
 .ru-empty--list {
   padding: 14px;

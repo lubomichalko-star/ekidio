@@ -16,6 +16,7 @@ export const tasksApi = {
       shared_task: !!task.shared_task,
       estimated_time: task.estimated_time || '',
       assigned_children: task.assigned_children || [],
+      icon: task.icon || '',
     }),
   delete: (id) => http.del(`/tasks/${id}`),
   updateDays: (taskId, days) =>
