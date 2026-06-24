@@ -6,6 +6,7 @@
     "dev": "vite",
     "build": "vite build",
     "deploy:web": "npm run build && node scripts/print-web-deploy.mjs",
+    "deploy:ftp": "npm run build && node scripts/prepare-plugin-deploy.mjs && node scripts/deploy-ftp.mjs",
     "preview": "vite preview",
     "cap:sync": "npx cap sync",
     "cap:android": "npm run build && npx cap sync android && npx cap open android",
@@ -20,6 +21,7 @@
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
     "@vitejs/plugin-vue": "^5.1.2",
+    "basic-ftp": "^5.0.5",
     "vite": "^5.4.0"
   },
   "dependencies": {

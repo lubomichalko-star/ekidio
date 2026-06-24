@@ -1,16 +1,12 @@
-# Deploy na server cez FTP (hosting bez SSH).
+# Deploy cez FTP – beží na self-hosted runner (tvoj PC).
+# Hosting blokuje FTP z GitHub cloud IP → ubuntu-latest nefunguje.
 #
-# Secrets (Settings → Secrets and variables → Actions):
-#   FTP_SERVER         – napr. ekidio.com alebo ftp.ekidio.com (NIE meno účtu)
-#   FTP_USERNAME       – napr. github.ekidio.com
-#   FTP_PASSWORD
-#   FTP_PLUGIN_DIR     – pre účet smerovaný do pluginu: /
-#   FTP_PROTOCOL       – ftps (odporúčané) alebo ftp
-#   FTP_PORT           – 21 (ftps explicit) alebo 990 (ftps implicit)
-#   FTP_DOWNLOAD_DIR   – voliteľné, len ak účet má prístup mimo pluginu
+# Možnosti:
+#   A) npm run deploy:ftp  (najrýchlejšie, z tvojho PC)
+#   B) Self-hosted runner  (automat po push, PC musí bežať)
 #
-# Účet github.ekidio.com → /wp-content/plugins/ekidio
-# FTP_PLUGIN_DIR musí byť: /
+# Secrets (rovnaké ako pre FileZilla):
+#   FTP_SERVER, FTP_USERNAME, FTP_PASSWORD, FTP_PLUGIN_DIR=/
 
 name: Deploy to server (FTP)
 
@@ -25,7 +21,7 @@ concurrency:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Windows, X64]
     timeout-minutes: 20
 
     steps:
@@ -38,59 +34,14 @@ jobs:
           node-version: '20'
           cache: npm
 
-      - name: Install & build
+      - name: Install, build & deploy
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_PLUGIN_DIR: ${{ secrets.FTP_PLUGIN_DIR }}
         run: |
           npm ci
           npm run build
-
-      - name: Prepare plugin package
-        run: node scripts/prepare-plugin-deploy.mjs
-
-      - name: Test FTP port reachability
-        run: |
-          PORT=21
-          SERVER="${{ secrets.FTP_SERVER }}"
-          echo "Kontrola portu $PORT na $SERVER ..."
-          if timeout 15 bash -c "cat < /dev/null > /dev/tcp/$SERVER/$PORT"; then
-            echo "Port $PORT je dostupný."
-          else
-            echo "Port $PORT nie je dostupný – skontroluj FTP_SERVER (skús ekidio.com alebo ftp.ekidio.com)."
-          fi
-
-      - name: Deploy WordPress plugin
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
-        with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          protocol: ftps
-          port: 21
-          local-dir: deploy/plugin/
-          server-dir: ${{ secrets.FTP_PLUGIN_DIR }}
-          dangerous-clean-slate: true
-          timeout: 300000
-          log-level: verbose
-
-      - name: Deploy download folder
-        env:
-          FTP_DOWNLOAD_DIR: ${{ secrets.FTP_DOWNLOAD_DIR }}
-        run: |
-          if [ -z "$FTP_DOWNLOAD_DIR" ]; then
-            echo "FTP_DOWNLOAD_DIR nie je nastavený – preskakujem download/"
-            exit 0
-          fi
-          echo "FTP_DOWNLOAD_DIR=$FTP_DOWNLOAD_DIR" >> "$GITHUB_ENV"
-
-      - name: Upload download folder
-        if: env.FTP_DOWNLOAD_DIR != ''
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
-        with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          protocol: ftps
-          port: 21
-          local-dir: download/
-          server-dir: ${{ env.FTP_DOWNLOAD_DIR }}
-          timeout: 300000
-          log-level: verbose
+          node scripts/prepare-plugin-deploy.mjs
+          node scripts/deploy-ftp.mjs

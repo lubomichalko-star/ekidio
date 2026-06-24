@@ -1,85 +1,60 @@
-# Deploy z GitHubu na server (FTP – bez SSH)
+# Deploy na server (FTP)
 
-Hosting **nemusí mať SSH**. Stačí FTP – GitHub Actions po každom `push` do `main` zbuildí web a nahraje súbory automaticky.
+## Prečo GitHub Actions zlyháva (`ETIMEDOUT`)
 
-## Ako to funguje
+FileZilla z tvojho PC **funguje**, ale GitHub cloud **nie** – hosting blokuje FTP z IP adres cloud serverov (185.102.21.128:21 timeout).
+
+To nie je zlý heslo ani zlá cesta – je to firewall hostingu.
+
+## Riešenie A – deploy z PC (najrýchlejšie)
+
+### 1. Vytvor `.env.deploy` (raz)
+
+Skopíruj `.env.deploy.example` → `.env.deploy` a doplň heslo:
 
 ```
-git push → GitHub Actions: npm run build → FTP upload → server
+FTP_SERVER=ftp.ekidio.com
+FTP_USERNAME=github.ekidio.com
+FTP_PASSWORD=tvoje_heslo
+FTP_PLUGIN_DIR=/
 ```
 
-`dist/` nie je v gite – build sa robí v CI pri každom deployi.
+### 2. Deploy jedným príkazom
 
-**Nemusíš** mať otvorenú konzolu ani ručne používať FTP klient.
+```powershell
+cd "C:\Users\lubom\Desktop\web\domace prace\ekidio"
+npm run deploy:ftp
+```
 
-## Nastavenie (raz)
+Build + upload – rovnaké údaje ako FileZilla.
 
-### 1. FTP údaje z hostingu
+## Riešenie B – automat po `git push` (self-hosted runner)
 
-Z panelu hostingu (FTP účet) si skopíruj:
+Workflow beží na **tvojom PC**, nie v GitHub cloude → FTP funguje.
 
-- server (napr. `ftp.ekidio.com`)
-- používateľ a heslo
-- po prihlásení cez FileZilla zisti **cesty** – často začínajú od `public_html/` alebo `www/`
+### 1. GitHub → Settings → Actions → Runners → **New self-hosted runner**
 
-Typické cesty:
+- OS: **Windows**, architektúra **x64**
+- Postupuj podľa inštrukcií (stiahni runner, spusti `config.cmd`)
 
-| Čo | Príklad cesty na FTP |
-|----|---------------------|
-| WordPress plugin | `public_html/wp-content/plugins/rodinne-ulohy` |
-| Download APK | `public_html/download` |
+### 2. Pri registrácii runnera
 
-Názov priečinka pluginu over v FileZille – musí zodpovedať tomu, čo už na serveri máš.
+- Labels: nechaj `self-hosted`, `Windows`, `X64` (workflow to vyžaduje)
+- Spusti runner: `run.cmd` (nech beží na pozadí alebo pri štarte PC)
 
-### 2. GitHub Secrets
+### 3. Secrets na GitHube (už máš)
 
-Repozitár → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**
-
-| Secret | Príklad |
+| Secret | Hodnota |
 |--------|---------|
 | `FTP_SERVER` | `ftp.ekidio.com` |
-| `FTP_USERNAME` | `uzivatel@ekidio.com` |
-| `FTP_PASSWORD` | heslo k FTP |
-| `FTP_PLUGIN_DIR` | `/` (účet `github.ekidio.com` je už v `plugins/ekidio`) |
-| `FTP_PROTOCOL` | `ftps` (ak zlyhá, skús `ftp`) |
-| `FTP_PORT` | `21` (ak zlyhá ftps, skús `990`) |
-| `FTP_DOWNLOAD_DIR` | len ak účet má prístup – inak vynechaj |
+| `FTP_USERNAME` | `github.ekidio.com` |
+| `FTP_PASSWORD` | heslo |
+| `FTP_PLUGIN_DIR` | `/` |
 
-`FTP_SERVER` bez `ftp://` – len hostname.
+### 4. Push → deploy
 
-### 3. Push workflow na GitHub
-
-```bash
-git add .github/workflows/deploy.yml scripts/prepare-plugin-deploy.mjs docs/DEPLOY.md
-git commit -m "FTP deploy from GitHub Actions"
-git push origin main
-```
-
-Stav deployu: GitHub → **Actions**.
-
-## Čo sa nasadí
-
-| Cieľ na serveri | Obsah |
-|-----------------|--------|
-| `wp-content/plugins/rodinne-ulohy/` | `rodinne-ulohy.php`, `includes/`, vygenerovaný `dist/` |
-| `/download/` | APK, `index.html`, `version.json` |
-
-**Nenasadí sa:** `src/`, `android/`, `node_modules/`.
-
-Plugin priečinok sa pri deployi **kompletne synchronizuje** (staré hashované súbory v `dist/` sa zmazajú – správne pre Vite build).
+Keď PC a runner bežia, `git push` spustí deploy automaticky.
 
 ## Overenie
 
-Po deployi otvor ekidio.com, `Ctrl+F5`, skontroluj verziu na login stránke.
-
-## Problémy
-
-| Problém | Riešenie |
-|---------|----------|
-| Actions zlyhá na FTP | Skontroluj server, heslo, cestu `FTP_PLUGIN_DIR` |
-| Web sa nezmenil | Zlá cesta k pluginu alebo cache – `Ctrl+F5` |
-| FileZilla ukazuje inú cestu | Skopíruj presnú cestu z FileZilly do secretu |
-
-## SSH (ak hosting v budúcnosti pridá)
-
-V repozitári môžeme prepnúť workflow na SSH/rsync – build ostáva rovnaký.
+Po deployi: ekidio.com → **Ctrl+F5** → skontroluj verziu na login stránke.
